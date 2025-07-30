@@ -7,8 +7,8 @@ import { useNotification } from '../context/NotificationContext'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { showSuccess, showError, showWarning, showInfo } = useNotification()
+  const [searchParams, setSearchParams] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -19,9 +19,17 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
 
+  // Get search params safely on client side
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      setSearchParams(params)
+    }
+  }, [])
+
   // Handle referral code from URL
   useEffect(() => {
-    if (typeof window !== 'undefined' && searchParams) {
+    if (searchParams) {
       const refCode = searchParams.get('ref')
       if (refCode) {
         setFormData(prev => ({
