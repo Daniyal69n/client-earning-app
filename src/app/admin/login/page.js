@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useNotification } from '../../context/NotificationContext'
 
 export default function AdminLoginPage() {
   const router = useRouter()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -15,9 +17,9 @@ export default function AdminLoginPage() {
   // Simple check for already logged in admin
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const adminLoginStatus = localStorage.getItem('isAdminLoggedIn')
+      const adminLoginStatus = sessionStorage.getItem('isAdminLoggedIn')
       if (adminLoginStatus === 'true') {
-        router.push('/admin')
+        router.push('/admin/dashboard')
       }
     }
   }, [router])
@@ -64,22 +66,22 @@ export default function AdminLoginPage() {
     try {
       // Simple admin authentication (in a real app, this would be a backend check)
       if (formData.username === 'admin' && formData.password === 'admin123') {
-        localStorage.setItem('isAdminLoggedIn', 'true')
-        localStorage.setItem('adminData', JSON.stringify({
+        sessionStorage.setItem('isAdminLoggedIn', 'true')
+        sessionStorage.setItem('adminData', JSON.stringify({
           username: formData.username,
           role: 'admin',
           loginTime: new Date().toISOString()
         }))
         
         // Redirect immediately without alert
-        router.push('/admin')
+        router.push('/admin/dashboard')
       } else {
-        alert('Invalid admin credentials. Please try again.')
+        showError('Invalid admin credentials. Please try again.')
         setIsLoading(false)
       }
       
     } catch (error) {
-      alert('Login failed. Please try again.')
+      showError('Login failed. Please try again.')
       setIsLoading(false)
     }
   }

@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useNotification } from '../context/NotificationContext'
+import { getCurrentUser } from '../../lib/api'
 
 export default function TeamPage() {
   const [activeNav, setActiveNav] = useState('team')
   const router = useRouter()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   
   // Team and referral states
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -14,25 +17,38 @@ export default function TeamPage() {
     teamSize: 0,
     totalDeposit: 0,
     totalWithdraw: 0,
-    teamMembers: []
+    teamMembers: [],
+    levelA: [],
+    levelB: [],
+    levelC: [],
+    totalEarnings: {
+      levelA: 0,
+      levelB: 0,
+      levelC: 0,
+      total: 0
+    }
   })
   const [userData, setUserData] = useState(null)
 
   // Load user data and team information
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Load current user data
-      const storedUserData = localStorage.getItem('userData')
-      if (storedUserData) {
-        const user = JSON.parse(storedUserData)
-        setUserData(user)
-        
-        // Generate referral link for this user
-        const baseUrl = window.location.origin
-        const userReferralLink = `${baseUrl}/register?ref=${user.phone}`
-        setReferralLink(userReferralLink)
+    const loadUserData = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (user) {
+          setUserData(user)
+          
+          // Generate referral link for this user
+          const baseUrl = window.location.origin
+          const userReferralLink = `${baseUrl}/register?ref=${user.phone}`
+          setReferralLink(userReferralLink)
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error)
       }
     }
+
+    loadUserData()
   }, [])
 
   // Load team data when userData changes
@@ -42,37 +58,39 @@ export default function TeamPage() {
     }
   }, [userData])
 
-  const loadTeamData = () => {
-    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-    const currentUser = userData
-    
-    if (currentUser) {
-      // Find team members (users who registered with this user's referral code)
-      const teamMembers = registeredUsers.filter(user => 
-        user.referralCode === currentUser.phone
-      )
-      
-      // Calculate team statistics
-      const teamSize = teamMembers.length
-      const totalDeposit = teamMembers.reduce((sum, member) => {
-        const memberBalance = parseFloat(localStorage.getItem(`userBalance_${member.phone}`) || '0')
-        return sum + memberBalance
-      }, 0)
-      
-      const totalWithdraw = teamMembers.reduce((sum, member) => {
-        const withdrawHistory = JSON.parse(localStorage.getItem(`withdrawHistory_${member.phone}`) || '[]')
-        const memberWithdraws = withdrawHistory.reduce((memberSum, withdraw) => 
-          memberSum + (withdraw.status === 'approved' ? parseFloat(withdraw.amount) : 0), 0
-        )
-        return sum + memberWithdraws
-      }, 0)
-
-      setTeamData({
-        teamSize,
-        totalDeposit,
-        totalWithdraw,
-        teamMembers
-      })
+  const loadTeamData = async () => {
+    try {
+      const response = await fetch(`/api/user/team?userId=${userData.phone}`)
+      if (response.ok) {
+        const data = await response.json()
+        
+        setTeamData({
+          teamSize: data.totalMembers,
+          totalDeposit: data.totalTeamEarnings,
+          totalWithdraw: 0, // This would need to be calculated from transactions
+          teamMembers: [...data.levelA.members, ...data.levelB.members, ...data.levelC.members],
+          levelA: data.levelA.members,
+          levelB: data.levelB.members,
+          levelC: data.levelC.members,
+          totalEarnings: {
+            levelA: data.levelA.members.reduce((sum, member) => {
+              const memberTotalActivity = member.balance + member.earnBalance
+              return sum + (memberTotalActivity * 0.16)
+            }, 0),
+            levelB: data.levelB.members.reduce((sum, member) => {
+              const memberTotalActivity = member.balance + member.earnBalance
+              return sum + (memberTotalActivity * 0.02)
+            }, 0),
+            levelC: data.levelC.members.reduce((sum, member) => {
+              const memberTotalActivity = member.balance + member.earnBalance
+              return sum + (memberTotalActivity * 0.02)
+            }, 0),
+            total: data.totalTeamEarnings
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Error loading team data:', error)
     }
   }
 
@@ -104,7 +122,7 @@ export default function TeamPage() {
   const copyReferralLink = async () => {
     try {
       await navigator.clipboard.writeText(referralLink)
-      alert('Referral link copied to clipboard!')
+      showSuccess('Referral link copied to clipboard!')
     } catch (err) {
       // Fallback for older browsers
       const textArea = document.createElement('textarea')
@@ -113,7 +131,7 @@ export default function TeamPage() {
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
-      alert('Referral link copied to clipboard!')
+      showSuccess('Referral link copied to clipboard!')
     }
   }
 
@@ -194,37 +212,79 @@ export default function TeamPage() {
             <h2 className="text-xl font-bold text-purple-900">Team Details</h2>
           </div>
           
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-purple-900 mb-3">Team 1</h3>
+          {/* Level A - Direct Referrals (16% Commission) */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-purple-900 mb-3 flex items-center">
+              <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center mr-2">
+                <span className="text-white text-xs font-bold">A</span>
+              </div>
+              Level A - Direct Referrals (16% Commission)
+            </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <svg className="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                  <span className="text-sm text-gray-600">Team Size: {teamData.teamSize}</span>
+                  <span className="text-sm text-gray-600">Members: {teamData.levelA.length}</span>
                 </div>
+                <span className="text-sm font-semibold text-green-600">Rs{teamData.totalEarnings.levelA.toFixed(2)}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Level B - Indirect Referrals (2% Commission) */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-purple-900 mb-3 flex items-center">
+              <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mr-2">
+                <span className="text-white text-xs font-bold">B</span>
+              </div>
+              Level B - Indirect Referrals (2% Commission)
+            </h3>
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-2">
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                  </div>
-                  <span className="text-sm text-gray-600">Total Deposit: Rs{teamData.totalDeposit.toFixed(2)}</span>
+                  <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span className="text-sm text-gray-600">Members: {teamData.levelB.length}</span>
                 </div>
+                <span className="text-sm font-semibold text-blue-600">Rs{teamData.totalEarnings.levelB.toFixed(2)}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Level C - Third Level Referrals (2% Commission) */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-purple-900 mb-3 flex items-center">
+              <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center mr-2">
+                <span className="text-white text-xs font-bold">C</span>
+              </div>
+              Level C - Third Level Referrals (2% Commission)
+            </h3>
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center mr-2">
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" />
-                    </svg>
-                  </div>
-                  <span className="text-sm text-gray-600">Total Withdraw: Rs{teamData.totalWithdraw.toFixed(2)}</span>
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span className="text-sm text-gray-600">Members: {teamData.levelC.length}</span>
                 </div>
+                <span className="text-sm font-semibold text-green-600">Rs{teamData.totalEarnings.levelC.toFixed(2)}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Total Earnings */}
+          <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <svg className="w-6 h-6 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+                <span className="text-lg font-bold text-purple-900">Total Team Earnings</span>
+              </div>
+              <span className="text-xl font-bold text-purple-900">Rs{teamData.totalEarnings.total.toFixed(2)}</span>
             </div>
           </div>
           

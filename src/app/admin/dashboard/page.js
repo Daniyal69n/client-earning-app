@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useNotification } from '../../context/NotificationContext'
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const [activeTab, setActiveTab] = useState('plans')
   const [plans, setPlans] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -36,76 +38,30 @@ export default function AdminDashboard() {
   // Sample plans data - in a real app, this would come from your backend
   const [samplePlans, setSamplePlans] = useState([])
 
-  // Load plans from localStorage on component mount
+  // Load plans from database only when admin is authenticated
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedPlans = localStorage.getItem('investmentPlans')
-      if (storedPlans) {
-        setSamplePlans(JSON.parse(storedPlans))
-      } else {
-                // Default plans if none stored
-        const defaultPlans = [
-          {
-            id: 1,
-            name: 'Honda Civic Type R',
-            image: 'car1.jpeg',
-            investAmount: '$5,000',
-            dailyIncome: '$25',
-            validity: '200 days',
-            color: 'from-red-500 to-red-700',
-            description: 'High performance variant with turbocharged engine',
-            isActive: true
-          },
-          {
-            id: 2,
-            name: 'Honda Civic Sedan',
-            image: 'car2.jpeg',
-            investAmount: '$3,500',
-            dailyIncome: '$17.50',
-            validity: '200 days',
-            color: 'from-blue-500 to-blue-700',
-            description: 'Classic four-door model with excellent fuel economy',
-            isActive: true
-          },
-          {
-            id: 3,
-            name: 'Honda Civic Hatchback',
-            image: 'car3.jpeg',
-            investAmount: '$4,000',
-            dailyIncome: '$20',
-            validity: '200 days',
-            color: 'from-green-500 to-green-700',
-            description: 'Versatile hatchback with sporty styling and ample cargo space',
-            isActive: true
-          },
-          {
-            id: 4,
-            name: 'Honda Civic Si',
-            image: 'car4.jpeg',
-            investAmount: '$4,500',
-            dailyIncome: '$22.50',
-            validity: '200 days',
-            color: 'from-yellow-500 to-yellow-700',
-            description: 'Sport-injected model with enhanced performance features',
-            isActive: true
-          },
-          {
-            id: 5,
-            name: 'Honda Civic Hybrid',
-            image: 'car5.jpeg',
-            investAmount: '$4,200',
-            dailyIncome: '$21',
-            validity: '200 days',
-            color: 'from-purple-500 to-purple-700',
-            description: 'Eco-friendly hybrid with excellent fuel efficiency',
-            isActive: false
+    if (isAdminLoggedIn && !isCheckingAuth) {
+      const loadPlans = async () => {
+        try {
+          console.log('Loading plans from database...')
+          const response = await fetch('/api/plans')
+          if (response.ok) {
+            const data = await response.json()
+            console.log('Found plans:', data)
+            setSamplePlans(data)
+          } else {
+            console.error('Failed to load plans')
+            showError('Failed to load investment plans')
           }
-        ]
-        setSamplePlans(defaultPlans)
-        localStorage.setItem('investmentPlans', JSON.stringify(defaultPlans))
+        } catch (error) {
+          console.error('Error loading plans:', error)
+          showError('Error loading investment plans')
+        }
       }
+
+      loadPlans()
     }
-  }, [])
+  }, [isAdminLoggedIn, isCheckingAuth, showError])
 
   const [newPlan, setNewPlan] = useState({
     name: '',
@@ -119,15 +75,19 @@ export default function AdminDashboard() {
   })
 
   useEffect(() => {
+    console.log('Syncing samplePlans to plans:', samplePlans)
     setPlans(samplePlans)
-    // Save to localStorage so user site can read the updated plans
-    localStorage.setItem('investmentPlans', JSON.stringify(samplePlans))
   }, [samplePlans])
+
+  // Debug useEffect to log plans state changes
+  useEffect(() => {
+    console.log('Plans state updated:', plans)
+  }, [plans])
 
   // Check admin authentication
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const adminLoginStatus = localStorage.getItem('isAdminLoggedIn')
+      const adminLoginStatus = sessionStorage.getItem('isAdminLoggedIn')
       if (adminLoginStatus === 'true') {
         setIsAdminLoggedIn(true)
       } else {
@@ -139,36 +99,55 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     if (confirm('Are you sure you want to logout from admin panel?')) {
-      localStorage.removeItem('isAdminLoggedIn')
-      localStorage.removeItem('adminData')
+      sessionStorage.removeItem('isAdminLoggedIn')
+      sessionStorage.removeItem('adminData')
       router.push('/admin')
     }
   }
 
-  const handleAddPlan = () => {
+  const handleAddPlan = async () => {
     if (!newPlan.name || !newPlan.investAmount || !newPlan.dailyIncome) {
-      alert('Please fill in all required fields')
+      showError('Please fill in all required fields')
       return
     }
 
-    const plan = {
-      ...newPlan,
-      id: Date.now(),
-      image: newPlan.image || 'car1.jpeg'
-    }
+    try {
+      const response = await fetch('/api/plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...newPlan,
+          image: newPlan.image || 'car1.jpeg'
+        }),
+      })
 
-    setSamplePlans([...samplePlans, plan])
-    setNewPlan({
-      name: '',
-      image: '',
-      investAmount: '',
-      dailyIncome: '',
-      validity: '',
-      color: 'from-purple-500 to-purple-700',
-      description: '',
-      isActive: true
-    })
-    setShowAddPlan(false)
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Plan created:', data.plan)
+        setSamplePlans([...samplePlans, data.plan])
+        showSuccess('Plan created successfully!')
+        
+        setNewPlan({
+          name: '',
+          image: '',
+          investAmount: '',
+          dailyIncome: '',
+          validity: '',
+          color: 'from-purple-500 to-purple-700',
+          description: '',
+          isActive: true
+        })
+        setShowAddPlan(false)
+      } else {
+        const error = await response.json()
+        showError(error.error || 'Failed to create plan')
+      }
+    } catch (error) {
+      console.error('Error creating plan:', error)
+      showError('Error creating plan')
+    }
   }
 
   const handleEditPlan = (plan) => {
@@ -186,44 +165,105 @@ export default function AdminDashboard() {
     setShowAddPlan(true)
   }
 
-  const handleUpdatePlan = () => {
+  const handleUpdatePlan = async () => {
     if (!editingPlan) return
 
-    const updatedPlans = samplePlans.map(plan => 
-      plan.id === editingPlan.id 
-        ? { ...plan, ...newPlan }
-        : plan
-    )
+    try {
+      const response = await fetch('/api/plans', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingPlan._id,
+          ...newPlan
+        }),
+      })
 
-    setSamplePlans(updatedPlans)
-    setEditingPlan(null)
-    setNewPlan({
-      name: '',
-      image: '',
-      investAmount: '',
-      dailyIncome: '',
-      validity: '',
-      color: 'from-purple-500 to-purple-700',
-      description: '',
-      isActive: true
-    })
-    setShowAddPlan(false)
-  }
-
-  const handleDeletePlan = (planId) => {
-    if (confirm('Are you sure you want to delete this plan?')) {
-      const updatedPlans = samplePlans.filter(plan => plan.id !== planId)
-      setSamplePlans(updatedPlans)
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Plan updated:', data.plan)
+        setSamplePlans(samplePlans.map(plan => 
+          plan._id === editingPlan._id ? data.plan : plan
+        ))
+        showSuccess('Plan updated successfully!')
+        
+        setEditingPlan(null)
+        setNewPlan({
+          name: '',
+          image: '',
+          investAmount: '',
+          dailyIncome: '',
+          validity: '',
+          color: 'from-purple-500 to-purple-700',
+          description: '',
+          isActive: true
+        })
+        setShowAddPlan(false)
+      } else {
+        const error = await response.json()
+        showError(error.error || 'Failed to update plan')
+      }
+    } catch (error) {
+      console.error('Error updating plan:', error)
+      showError('Error updating plan')
     }
   }
 
-  const handleTogglePlanStatus = (planId) => {
-    const updatedPlans = samplePlans.map(plan => 
-      plan.id === planId 
-        ? { ...plan, isActive: !plan.isActive }
-        : plan
-    )
-    setSamplePlans(updatedPlans)
+  const handleDeletePlan = async (planId) => {
+    if (confirm('Are you sure you want to delete this plan?')) {
+      try {
+        const response = await fetch(`/api/plans?id=${planId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (response.ok) {
+          setSamplePlans(samplePlans.filter(plan => plan._id !== planId))
+          showSuccess('Plan deleted successfully!')
+        } else {
+          const error = await response.json()
+          showError(error.error || 'Failed to delete plan')
+        }
+      } catch (error) {
+        console.error('Error deleting plan:', error)
+        showError('Error deleting plan')
+      }
+    }
+  }
+
+  const handleTogglePlanStatus = async (planId) => {
+    try {
+      const plan = samplePlans.find(p => p._id === planId)
+      if (!plan) return
+
+      const response = await fetch('/api/plans', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: planId,
+          isActive: !plan.isActive
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSamplePlans(samplePlans.map(p => 
+          p._id === planId ? data.plan : p
+        ))
+        showSuccess(`Plan ${data.plan.isActive ? 'activated' : 'deactivated'} successfully!`)
+      } else {
+        const error = await response.json()
+        showError(error.error || 'Failed to toggle plan status')
+      }
+    } catch (error) {
+      console.error('Error toggling plan status:', error)
+      showError('Error toggling plan status')
+    }
   }
 
   const handleCancelEdit = () => {
@@ -296,190 +336,292 @@ export default function AdminDashboard() {
   }
 
   // Load pending requests and users
+  // Load admin data only when authenticated
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const rechargeRequests = JSON.parse(localStorage.getItem('pendingRechargeRequests') || '[]')
-      const withdrawRequests = JSON.parse(localStorage.getItem('pendingWithdrawRequests') || '[]')
-      setPendingRechargeRequests(rechargeRequests)
-      setPendingWithdrawRequests(withdrawRequests)
-      
-      // Load users from localStorage
-      const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-      setUsers(registeredUsers)
-      
-                    // Load payment details
-              const storedPaymentDetails = localStorage.getItem('paymentDetails')
-              if (storedPaymentDetails) {
-                setPaymentDetails(JSON.parse(storedPaymentDetails))
-              } else {
-                // Default payment details
-                const defaultPaymentDetails = {
-                  easypaisa: { number: '0300 1234567', accountName: 'Honda Civic Investment' },
-                  jazzcash: { number: '0300 7654321', accountName: 'Honda Civic Investment' }
-                }
-                setPaymentDetails(defaultPaymentDetails)
-                localStorage.setItem('paymentDetails', JSON.stringify(defaultPaymentDetails))
-              }
-
-              // Load coupons
-              const storedCoupons = localStorage.getItem('availableCoupons')
-              if (storedCoupons) {
-                setCoupons(JSON.parse(storedCoupons))
-              } else {
-                // Default coupons
-                const defaultCoupons = [
-                  {
-                    id: 1,
-                    code: 'WELCOME10',
-                    bonusAmount: 10,
-                    maxUsage: 100,
-                    usageCount: 0,
-                    isActive: true,
-                    description: 'Welcome bonus for new users',
-                    createdAt: new Date().toISOString()
-                  },
-                  {
-                    id: 2,
-                    code: 'BONUS20',
-                    bonusAmount: 20,
-                    maxUsage: 50,
-                    usageCount: 0,
-                    isActive: true,
-                    description: 'Special bonus code',
-                    createdAt: new Date().toISOString()
-                  }
-                ]
-                setCoupons(defaultCoupons)
-                localStorage.setItem('availableCoupons', JSON.stringify(defaultCoupons))
-              }
-
-              // Load used coupons
-              const storedUsedCoupons = localStorage.getItem('usedCoupons')
-              if (storedUsedCoupons) {
-                setUsedCoupons(JSON.parse(storedUsedCoupons))
-              }
-            }
-          }, [])
-
-  // Handle recharge approval
-  const handleRechargeApproval = (requestId, approved) => {
-    const updatedRequests = pendingRechargeRequests.filter(req => req.id !== requestId)
-    setPendingRechargeRequests(updatedRequests)
-    localStorage.setItem('pendingRechargeRequests', JSON.stringify(updatedRequests))
-
-    if (approved) {
-      // Update user balance
-      const request = pendingRechargeRequests.find(req => req.id === requestId)
-      if (request) {
-        const userBalance = parseFloat(localStorage.getItem(`userBalance_${request.userId}`) || '0')
-        const newBalance = userBalance + request.amount
-        localStorage.setItem(`userBalance_${request.userId}`, newBalance.toString())
-        
-        // Update recharge history
-        const rechargeHistory = JSON.parse(localStorage.getItem('rechargeHistory') || '[]')
-        const updatedHistory = rechargeHistory.map(req => 
-          req.id === requestId ? { ...req, status: 'approved' } : req
-        )
-        localStorage.setItem('rechargeHistory', JSON.stringify(updatedHistory))
-        
-        // Add to user's recharge history if not already there
-        const userRechargeHistory = JSON.parse(localStorage.getItem(`rechargeHistory_${request.userId}`) || '[]')
-        if (!userRechargeHistory.find(req => req.id === requestId)) {
-          userRechargeHistory.push({ ...request, status: 'approved' })
-          localStorage.setItem(`rechargeHistory_${request.userId}`, JSON.stringify(userRechargeHistory))
+    if (isAdminLoggedIn && !isCheckingAuth && typeof window !== 'undefined') {
+      // Load users from MongoDB API
+      const loadUsers = async () => {
+        try {
+          const response = await fetch('/api/admin/users')
+          if (response.ok) {
+            const data = await response.json()
+            setUsers(data.users || [])
+          } else {
+            console.error('Failed to load users from API')
+            setUsers([])
+          }
+        } catch (error) {
+          console.error('Error loading users:', error)
+          setUsers([])
         }
       }
-    } else {
-      // Update recharge history to rejected
-      const rechargeHistory = JSON.parse(localStorage.getItem('rechargeHistory') || '[]')
-      const updatedHistory = rechargeHistory.map(req => 
-        req.id === requestId ? { ...req, status: 'rejected' } : req
-      )
-      localStorage.setItem('rechargeHistory', JSON.stringify(updatedHistory))
+      
+      // Load payment details from database
+      const loadPaymentDetails = async () => {
+        try {
+          const response = await fetch('/api/settings?key=paymentDetails')
+          if (response.ok) {
+            const data = await response.json()
+            if (data && data.value) {
+              setPaymentDetails(data.value)
+            } else {
+              // Default payment details
+              const defaultPaymentDetails = {
+                easypaisa: { number: '0300 1234567', accountName: 'Honda Civic Investment' },
+                jazzcash: { number: '0300 7654321', accountName: 'Honda Civic Investment' }
+              }
+              setPaymentDetails(defaultPaymentDetails)
+            }
+          } else {
+            // If API fails, use default payment details
+            const defaultPaymentDetails = {
+              easypaisa: { number: '0300 1234567', accountName: 'Honda Civic Investment' },
+              jazzcash: { number: '0300 7654321', accountName: 'Honda Civic Investment' }
+            }
+            setPaymentDetails(defaultPaymentDetails)
+          }
+        } catch (error) {
+          console.error('Error loading payment details:', error)
+          // Use default payment details on error
+          const defaultPaymentDetails = {
+            easypaisa: { number: '0300 1234567', accountName: 'Honda Civic Investment' },
+            jazzcash: { number: '0300 7654321', accountName: 'Honda Civic Investment' }
+          }
+          setPaymentDetails(defaultPaymentDetails)
+        }
+      }
+
+      // Load coupons from database
+      const loadCoupons = async () => {
+        try {
+          const response = await fetch('/api/coupons')
+          if (response.ok) {
+            const data = await response.json()
+            setCoupons(data)
+          } else {
+            console.error('Failed to load coupons from API')
+            setCoupons([])
+          }
+        } catch (error) {
+          console.error('Error loading coupons:', error)
+          setCoupons([])
+        }
+      }
+
+      // Load transactions for pending requests
+      const loadPendingRequests = async () => {
+        try {
+          const rechargeResponse = await fetch('/api/transactions?type=recharge&status=pending')
+          const withdrawResponse = await fetch('/api/transactions?type=withdraw&status=pending')
+          
+          if (rechargeResponse.ok) {
+            const rechargeData = await rechargeResponse.json()
+            setPendingRechargeRequests(rechargeData)
+          }
+          
+          if (withdrawResponse.ok) {
+            const withdrawData = await withdrawResponse.json()
+            setPendingWithdrawRequests(withdrawData)
+          }
+        } catch (error) {
+          console.error('Error loading pending requests:', error)
+        }
+      }
+      
+      // Load all data
+      loadUsers()
+      loadPaymentDetails()
+      loadCoupons()
+      loadPendingRequests()
+      
+      // Set up periodic refresh every 30 seconds
+      const refreshInterval = setInterval(() => {
+        loadUsers()
+        loadPaymentDetails()
+        loadCoupons()
+        loadPendingRequests()
+      }, 30000)
+      
+      return () => {
+        clearInterval(refreshInterval)
+      }
+    }
+  }, [isAdminLoggedIn, isCheckingAuth])
+
+  // Handle recharge approval
+  const handleRechargeApproval = async (requestId, approved) => {
+    try {
+      // Call the API to update the transaction status
+      const response = await fetch('/api/transactions', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactionId: requestId,
+          action: approved ? 'approve' : 'reject'
+        }),
+      });
+
+      if (response.ok) {
+        showSuccess(`Recharge request ${approved ? 'approved' : 'rejected'} successfully`);
+        // Refresh the pending requests list
+        const loadPendingRequests = async () => {
+          try {
+            const rechargeResponse = await fetch('/api/transactions?type=recharge&status=pending')
+            const withdrawResponse = await fetch('/api/transactions?type=withdraw&status=pending')
+            
+            if (rechargeResponse.ok) {
+              const rechargeData = await rechargeResponse.json()
+              setPendingRechargeRequests(rechargeData)
+            }
+            
+            if (withdrawResponse.ok) {
+              const withdrawData = await withdrawResponse.json()
+              setPendingWithdrawRequests(withdrawData)
+            }
+          } catch (error) {
+            console.error('Error loading pending requests:', error)
+          }
+        }
+        loadPendingRequests()
+      } else {
+        const errorData = await response.json()
+        showError(errorData.message || 'Failed to update transaction status')
+      }
+    } catch (error) {
+      console.error('Error updating transaction:', error)
+      showError('Failed to update transaction status')
     }
   }
 
   // Handle withdraw approval
-  const handleWithdrawApproval = (requestId, approved) => {
-    const updatedRequests = pendingWithdrawRequests.filter(req => req.id !== requestId)
-    setPendingWithdrawRequests(updatedRequests)
-    localStorage.setItem('pendingWithdrawRequests', JSON.stringify(updatedRequests))
+  const handleWithdrawApproval = async (requestId, approved) => {
+    try {
+      // Call the API to update the transaction status
+      const response = await fetch('/api/transactions', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactionId: requestId,
+          action: approved ? 'approve' : 'reject'
+        }),
+      });
 
-    if (!approved) {
-      // If rejected, return the amount to user balance
-      const request = pendingWithdrawRequests.find(req => req.id === requestId)
-      if (request) {
-        const userBalance = parseFloat(localStorage.getItem(`userBalance_${request.userId}`) || '0')
-        const newBalance = userBalance + request.amount
-        localStorage.setItem(`userBalance_${request.userId}`, newBalance.toString())
+      if (response.ok) {
+        showSuccess(`Withdrawal request ${approved ? 'approved' : 'rejected'} successfully`);
+        // Refresh the pending requests list
+        const loadPendingRequests = async () => {
+          try {
+            const rechargeResponse = await fetch('/api/transactions?type=recharge&status=pending')
+            const withdrawResponse = await fetch('/api/transactions?type=withdraw&status=pending')
+            
+            if (rechargeResponse.ok) {
+              const rechargeData = await rechargeResponse.json()
+              setPendingRechargeRequests(rechargeData)
+            }
+            
+            if (withdrawResponse.ok) {
+              const withdrawData = await withdrawResponse.json()
+              setPendingWithdrawRequests(withdrawData)
+            }
+          } catch (error) {
+            console.error('Error loading pending requests:', error)
+          }
+        }
+        loadPendingRequests()
+      } else {
+        const errorData = await response.json()
+        showError(errorData.message || 'Failed to update transaction status')
       }
-    }
-
-    // Update withdraw history
-    const withdrawHistory = JSON.parse(localStorage.getItem('withdrawHistory') || '[]')
-    const updatedHistory = withdrawHistory.map(req => 
-      req.id === requestId ? { ...req, status: approved ? 'approved' : 'rejected' } : req
-    )
-    localStorage.setItem('withdrawHistory', JSON.stringify(updatedHistory))
-    
-    // Add to user's withdraw history if not already there
-    const request = pendingWithdrawRequests.find(req => req.id === requestId)
-    if (request) {
-      const userWithdrawHistory = JSON.parse(localStorage.getItem(`withdrawHistory_${request.userId}`) || '[]')
-      if (!userWithdrawHistory.find(req => req.id === requestId)) {
-        userWithdrawHistory.push({ ...request, status: approved ? 'approved' : 'rejected' })
-        localStorage.setItem(`withdrawHistory_${request.userId}`, JSON.stringify(userWithdrawHistory))
-      }
+    } catch (error) {
+      console.error('Error updating transaction:', error)
+      showError('Failed to update transaction status')
     }
   }
 
   // Handle user management
-  const handleBlockUser = (userId) => {
+  const handleBlockUser = async (userId) => {
     if (confirm('Are you sure you want to block this user?')) {
-      const updatedUsers = users.map(user => 
-        user.phone === userId 
-          ? { ...user, isBlocked: !user.isBlocked }
-          : user
-      )
-      setUsers(updatedUsers)
-      localStorage.setItem('registeredUsers', JSON.stringify(updatedUsers))
-      
-      // If blocking, also log them out immediately
-      if (updatedUsers.find(u => u.phone === userId)?.isBlocked) {
-        // Clear their current session
-        const currentUserData = JSON.parse(localStorage.getItem('userData') || '{}')
-        if (currentUserData.phone === userId) {
-          localStorage.removeItem('isLoggedIn')
-          localStorage.removeItem('userData')
-          alert(`User ${currentUserData.name} has been blocked and logged out.`)
+      try {
+        const response = await fetch('/api/admin/users', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: userId,
+            action: 'toggleBlock'
+          }),
+        })
+
+        if (response.ok) {
+          // Refresh users list
+          const loadUsers = async () => {
+            try {
+              const userResponse = await fetch('/api/admin/users')
+              if (userResponse.ok) {
+                const userData = await userResponse.json()
+                setUsers(userData.users || [])
+              }
+            } catch (error) {
+              console.error('Error refreshing users:', error)
+            }
+          }
+          loadUsers()
+          
+          const user = users.find(u => u.phone === userId)
+          const action = user?.isBlocked ? 'unblocked' : 'blocked'
+          showSuccess(`User ${userId} has been ${action}`)
+        } else {
+          showError('Failed to update user status')
         }
-        
-        // Remove from logged in users
-        const loggedInUsers = JSON.parse(localStorage.getItem('loggedInUsers') || '[]')
-        const filteredUsers = loggedInUsers.filter(u => u.phone !== userId)
-        localStorage.setItem('loggedInUsers', JSON.stringify(filteredUsers))
-      } else {
-        // If unblocking, show confirmation
-        const user = updatedUsers.find(u => u.phone === userId)
-        alert(`User ${user.name} has been unblocked and can now log in.`)
+      } catch (error) {
+        console.error('Error blocking user:', error)
+        showError('Failed to update user status')
       }
     }
   }
 
-  const handleDeleteUser = (userId) => {
+  const handleDeleteUser = async (userId) => {
     if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      const updatedUsers = users.filter(user => user.phone !== userId)
-      setUsers(updatedUsers)
-      localStorage.setItem('registeredUsers', JSON.stringify(updatedUsers))
-      
-      // Also remove from logged in users
-      const loggedInUsers = JSON.parse(localStorage.getItem('loggedInUsers') || '[]')
-      const filteredUsers = loggedInUsers.filter(u => u.phone !== userId)
-      localStorage.setItem('loggedInUsers', JSON.stringify(filteredUsers))
-      
-      // Remove user data
-      localStorage.removeItem(`userData_${userId}`)
-      localStorage.removeItem(`userBalance_${userId}`)
+      try {
+        const response = await fetch('/api/admin/users', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: userId,
+            action: 'delete'
+          }),
+        })
+
+        if (response.ok) {
+          // Refresh users list
+          const loadUsers = async () => {
+            try {
+              const userResponse = await fetch('/api/admin/users')
+              if (userResponse.ok) {
+                const userData = await userResponse.json()
+                setUsers(userData.users || [])
+              }
+            } catch (error) {
+              console.error('Error refreshing users:', error)
+            }
+          }
+          loadUsers()
+          
+          showSuccess(`User ${userId} has been deleted successfully`)
+        } else {
+          showError('Failed to delete user')
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error)
+        showError('Failed to delete user')
+      }
     }
   }
 
@@ -492,7 +634,7 @@ export default function AdminDashboard() {
       )
       setUsers(updatedUsers)
       localStorage.setItem('registeredUsers', JSON.stringify(updatedUsers))
-      alert('Password reset initiated. User will be prompted to set a new password on next login.')
+      showSuccess('Password reset initiated. User will be prompted to set a new password on next login.')
     }
   }
 
@@ -510,62 +652,98 @@ export default function AdminDashboard() {
   }
 
   // Coupon management functions
-  const handleAddCoupon = () => {
+  const handleAddCoupon = async () => {
     if (!newCoupon.code || !newCoupon.bonusAmount) {
-      alert('Please fill in all required fields')
+      showError('Please fill in all required fields')
       return
     }
 
-    const couponExists = coupons.some(c => c.code.toLowerCase() === newCoupon.code.toLowerCase())
-    if (couponExists) {
-      alert('Coupon code already exists')
-      return
+    try {
+      const response = await fetch('/api/coupons', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: newCoupon.code.toUpperCase(),
+          bonusAmount: parseFloat(newCoupon.bonusAmount),
+          maxUsage: newCoupon.maxUsage ? parseInt(newCoupon.maxUsage) : null,
+          isActive: newCoupon.isActive,
+          description: newCoupon.description
+        }),
+      })
+
+      if (response.ok) {
+        const coupon = await response.json()
+        setCoupons(prev => [...prev, coupon])
+        
+        // Reset form
+        setNewCoupon({
+          code: '',
+          bonusAmount: '',
+          maxUsage: '',
+          isActive: true,
+          description: ''
+        })
+        setShowAddCoupon(false)
+        showSuccess('Coupon created successfully!')
+      } else {
+        const error = await response.json()
+        showError(error.message || 'Failed to create coupon')
+      }
+    } catch (error) {
+      console.error('Error creating coupon:', error)
+      showError('Failed to create coupon')
     }
-
-    const coupon = {
-      id: Date.now(),
-      code: newCoupon.code.toUpperCase(),
-      bonusAmount: parseFloat(newCoupon.bonusAmount),
-      maxUsage: newCoupon.maxUsage ? parseInt(newCoupon.maxUsage) : null,
-      usageCount: 0,
-      isActive: newCoupon.isActive,
-      description: newCoupon.description,
-      createdAt: new Date().toISOString()
-    }
-
-    const updatedCoupons = [...coupons, coupon]
-    setCoupons(updatedCoupons)
-    localStorage.setItem('availableCoupons', JSON.stringify(updatedCoupons))
-
-    // Reset form
-    setNewCoupon({
-      code: '',
-      bonusAmount: '',
-      maxUsage: '',
-      isActive: true,
-      description: ''
-    })
-    setShowAddCoupon(false)
-
-    alert('Coupon created successfully!')
   }
 
-  const handleToggleCouponStatus = (couponId) => {
-    const updatedCoupons = coupons.map(coupon =>
-      coupon.id === couponId
-        ? { ...coupon, isActive: !coupon.isActive }
-        : coupon
-    )
-    setCoupons(updatedCoupons)
-    localStorage.setItem('availableCoupons', JSON.stringify(updatedCoupons))
+  const handleToggleCouponStatus = async (couponId) => {
+    try {
+      const response = await fetch('/api/coupons', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          couponId: couponId,
+          action: 'toggle'
+        }),
+      })
+
+      if (response.ok) {
+        const updatedCoupon = await response.json()
+        setCoupons(prev => prev.map(coupon => 
+          coupon._id === couponId ? updatedCoupon : coupon
+        ))
+        showSuccess('Coupon status updated successfully!')
+      } else {
+        const error = await response.json()
+        showError(error.message || 'Failed to update coupon')
+      }
+    } catch (error) {
+      console.error('Error updating coupon:', error)
+      showError('Failed to update coupon')
+    }
   }
 
-  const handleDeleteCoupon = (couponId) => {
+  const handleDeleteCoupon = async (couponId) => {
     if (confirm('Are you sure you want to delete this coupon?')) {
-      const updatedCoupons = coupons.filter(coupon => coupon.id !== couponId)
-      setCoupons(updatedCoupons)
-      localStorage.setItem('availableCoupons', JSON.stringify(updatedCoupons))
-      alert('Coupon deleted successfully!')
+      try {
+        const response = await fetch(`/api/coupons?id=${couponId}`, {
+          method: 'DELETE',
+        })
+
+        if (response.ok) {
+          setCoupons(prev => prev.filter(coupon => coupon._id !== couponId))
+          showSuccess('Coupon deleted successfully!')
+        } else {
+          const error = await response.json()
+          showError(error.message || 'Failed to delete coupon')
+        }
+      } catch (error) {
+        console.error('Error deleting coupon:', error)
+        showError('Failed to delete coupon')
+      }
     }
   }
 
@@ -624,10 +802,10 @@ export default function AdminDashboard() {
       <div className="container mx-auto px-4 py-6">
         {/* Tab Navigation */}
         <div className="bg-white rounded-lg shadow-lg mb-6">
-          <div className="flex border-b">
+          <div className="flex border-b overflow-x-auto scrollbar-hide">
             <button
               onClick={() => setActiveTab('plans')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'plans'
                   ? 'text-purple-600 border-b-2 border-purple-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -637,7 +815,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('users')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'users'
                   ? 'text-purple-600 border-b-2 border-purple-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -647,7 +825,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'analytics'
                   ? 'text-purple-600 border-b-2 border-purple-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -657,7 +835,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('images')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'images'
                   ? 'text-purple-600 border-b-2 border-purple-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -667,7 +845,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('transactions')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'transactions'
                   ? 'text-purple-600 border-b-2 border-purple-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -677,7 +855,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('payments')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'payments'
                   ? 'text-purple-600 border-b-2 border-purple-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -687,7 +865,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('coupons')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'coupons'
                   ? 'text-purple-600 border-b-2 border-purple-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -777,11 +955,11 @@ export default function AdminDashboard() {
                               const file = e.target.files[0];
                               if (file) {
                                 if (file.size > 5 * 1024 * 1024) {
-                                  alert('File size must be less than 5MB');
+                                  showError('File size must be less than 5MB');
                                   return;
                                 }
                                 if (!file.type.startsWith('image/')) {
-                                  alert('Please select an image file');
+                                  showError('Please select an image file');
                                   return;
                                 }
                                 const reader = new FileReader();
@@ -908,14 +1086,41 @@ export default function AdminDashboard() {
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-bold text-gray-800">Investment Plans</h3>
-                  {!showAddPlan && (
+                  <div className="flex space-x-3">
                     <button
-                      onClick={() => setShowAddPlan(true)}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                      onClick={async () => {
+                        console.log('Manual refresh of plans')
+                        try {
+                          const response = await fetch('/api/plans')
+                          if (response.ok) {
+                            const data = await response.json()
+                            console.log('Refreshing plans:', data.plans)
+                            setSamplePlans(data.plans)
+                            showSuccess('Plans refreshed successfully!')
+                          } else {
+                            showError('Failed to refresh plans')
+                          }
+                        } catch (error) {
+                          console.error('Error refreshing plans:', error)
+                          showError('Error refreshing plans')
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
                     >
-                      Add New Plan
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <span>Refresh</span>
                     </button>
-                  )}
+                    {!showAddPlan && (
+                      <button
+                        onClick={() => setShowAddPlan(true)}
+                        className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                      >
+                        Add New Plan
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -930,7 +1135,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {plans.map((plan) => (
+                    {plans && plans.length > 0 ? plans.map((plan) => (
                       <tr key={plan.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -974,7 +1179,7 @@ export default function AdminDashboard() {
                               Edit
                             </button>
                             <button
-                              onClick={() => handleTogglePlanStatus(plan.id)}
+                              onClick={() => handleTogglePlanStatus(plan._id)}
                               className={`${
                                 plan.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
                               }`}
@@ -982,7 +1187,7 @@ export default function AdminDashboard() {
                               {plan.isActive ? 'Deactivate' : 'Activate'}
                             </button>
                             <button
-                              onClick={() => handleDeletePlan(plan.id)}
+                              onClick={() => handleDeletePlan(plan._id)}
                               className="text-red-600 hover:text-red-900"
                             >
                               Delete
@@ -990,7 +1195,13 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                          No plans found. Loading...
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1000,8 +1211,35 @@ export default function AdminDashboard() {
 
         {activeTab === 'users' && (
           <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">User Management</h3>
-            <p className="text-gray-600 mb-6">Manage registered users and their accounts.</p>
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">User Management</h3>
+                <p className="text-gray-600">Manage registered users and their accounts.</p>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/admin/users')
+                    if (response.ok) {
+                      const data = await response.json()
+                      setUsers(data.users || [])
+                      showSuccess('Users list refreshed successfully!')
+                    } else {
+                      showError('Failed to refresh users list')
+                    }
+                  } catch (error) {
+                    console.error('Error refreshing users:', error)
+                    showError('Failed to refresh users list')
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Refresh</span>
+              </button>
+            </div>
             
             {users.length === 0 ? (
               <div className="text-center py-8">
@@ -1349,12 +1587,12 @@ export default function AdminDashboard() {
                           if (file) {
                             // Check file size (5MB limit)
                             if (file.size > 5 * 1024 * 1024) {
-                              alert('File size must be less than 5MB');
+                              showError('File size must be less than 5MB');
                               return;
                             }
                             // Check file type
                             if (!file.type.startsWith('image/')) {
-                              alert('Please select an image file');
+                              showError('Please select an image file');
                               return;
                             }
                             handleFileUpload(file, imageName);
@@ -1406,13 +1644,13 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleRechargeApproval(request.id, true)}
+                            onClick={() => handleRechargeApproval(request.transactionId, true)}
                             className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                           >
                             Approve
                           </button>
                           <button
-                            onClick={() => handleRechargeApproval(request.id, false)}
+                            onClick={() => handleRechargeApproval(request.transactionId, false)}
                             className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                           >
                             Reject
@@ -1446,13 +1684,13 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleWithdrawApproval(request.id, true)}
+                            onClick={() => handleWithdrawApproval(request.transactionId, true)}
                             className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                           >
                             Approve
                           </button>
                           <button
-                            onClick={() => handleWithdrawApproval(request.id, false)}
+                            onClick={() => handleWithdrawApproval(request.transactionId, false)}
                             className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                           >
                             Reject
@@ -1673,7 +1911,7 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {coupons.map((coupon) => (
-                        <tr key={coupon.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <tr key={coupon._id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4">
                             <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded text-black">
                               {coupon.code}
@@ -1703,7 +1941,7 @@ export default function AdminDashboard() {
                           <td className="py-3 px-4">
                             <div className="flex space-x-2">
                               <button
-                                onClick={() => handleToggleCouponStatus(coupon.id)}
+                                onClick={() => handleToggleCouponStatus(coupon._id)}
                                 className={`px-2 py-1 rounded text-xs ${
                                   coupon.isActive
                                     ? 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -1713,7 +1951,7 @@ export default function AdminDashboard() {
                                 {coupon.isActive ? 'Deactivate' : 'Activate'}
                               </button>
                               <button
-                                onClick={() => handleDeleteCoupon(coupon.id)}
+                                onClick={() => handleDeleteCoupon(coupon._id)}
                                 className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
                               >
                                 Delete

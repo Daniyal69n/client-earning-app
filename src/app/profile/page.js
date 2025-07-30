@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useNotification } from '../context/NotificationContext'
+import { getCurrentUser, updateUserBalance } from '../../lib/api'
 
 export default function ProfilePage() {
   const router = useRouter()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const [activeNav, setActiveNav] = useState('profile')
   const [userName, setUserName] = useState('John Doe')
   const [userPhone, setUserPhone] = useState('+92 300 ****567')
@@ -26,62 +29,202 @@ export default function ProfilePage() {
   
   // Income tracking states
   const [todayIncome, setTodayIncome] = useState(0)
-  const [cumulativeIncome, setCumulativeIncome] = useState(0)
+  const [earnBalance, setEarnBalance] = useState(0)
+  const [totalRecharge, setTotalRecharge] = useState(0)
   const [teamSize, setTeamSize] = useState(0)
   const [investments, setInvestments] = useState([])
+  const [currentPlan, setCurrentPlan] = useState(null)
+  
+
+
+  // Refresh user data from database
+  const refreshUserData = async () => {
+    try {
+      console.log('refreshUserData called - fetching user data...');
+      const user = await getCurrentUser(true); // Force refresh from database
+      console.log('User data fetched in profile:', user);
+      
+      if (user) {
+        setUserName(user.name || 'John Doe');
+        setUserPhone(user.phone || '+92 300 ****567');
+        setUserData(user);
+        setBalance(user.balance || 0);
+        setEarnBalance(user.earnBalance || 0);
+        setTotalRecharge(user.totalRecharge || 0);
+        console.log('User data set in profile state:', {
+          balance: user.balance || 0,
+          earnBalance: user.earnBalance || 0,
+          totalRecharge: user.totalRecharge || 0
+        });
+        showSuccess('Data refreshed successfully!');
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+      showError('Failed to refresh data');
+    }
+  };
 
   // Load user data on component mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUserData = localStorage.getItem('userData')
-      if (storedUserData) {
-        const user = JSON.parse(storedUserData)
-        setUserName(user.name || 'John Doe')
-        setUserPhone(user.phone || '+92 300 ****567')
-        setUserData(user)
-        
-        // Load user balance and history
-        const userBalance = localStorage.getItem(`userBalance_${user.phone}`) || '0'
-        setBalance(parseFloat(userBalance))
-      }
-      
-      const storedRechargeHistory = localStorage.getItem('rechargeHistory') || '[]'
-      setRechargeHistory(JSON.parse(storedRechargeHistory))
-      
-      const storedWithdrawHistory = localStorage.getItem('withdrawHistory') || '[]'
-      setWithdrawHistory(JSON.parse(storedWithdrawHistory))
-      
-      // Load payment details
-      const storedPaymentDetails = localStorage.getItem('paymentDetails')
-      if (storedPaymentDetails) {
-        setPaymentDetails(JSON.parse(storedPaymentDetails))
-      } else {
-        // Default payment details
-        const defaultPaymentDetails = {
-          easypaisa: { number: '0300 1234567', accountName: 'Honda Civic Investment' },
-          jazzcash: { number: '0300 7654321', accountName: 'Honda Civic Investment' }
+    const loadUserData = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (user) {
+          setUserName(user.name || 'John Doe')
+          setUserPhone(user.phone || '+92 300 ****567')
+          setUserData(user)
+          setBalance(user.balance || 0)
+          setEarnBalance(user.earnBalance || 0)
+          setTotalRecharge(user.totalRecharge || 0)
+          
+          // Load current plan
+          const response = await fetch('/api/user/investments?active=true')
+          if (response.ok) {
+            const investments = await response.json()
+            if (investments.length > 0) {
+              setCurrentPlan(investments[0])
+            }
+          }
+          
+          // Load transaction history
+          await loadTransactionHistory(user.phone)
+          
+          // Load team data
+          await loadTeamData(user.phone)
         }
-        setPaymentDetails(defaultPaymentDetails)
-        localStorage.setItem('paymentDetails', JSON.stringify(defaultPaymentDetails))
+      } catch (error) {
+        console.error('Error loading user data:', error)
       }
     }
+
+    loadUserData()
   }, [])
 
-  // Refresh balance when component mounts or userData changes
+  // Auto-refresh user data every 30 seconds to show updated balances
   useEffect(() => {
-    if (userData) {
-      const userBalance = localStorage.getItem(`userBalance_${userData.phone}`) || '0'
-      setBalance(parseFloat(userBalance))
-      calculateIncome()
-    }
+    const interval = setInterval(() => {
+      if (userData) {
+        refreshUserData()
+      }
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
   }, [userData])
 
-  // Recalculate income when history data changes
+  // Load payment details from database
   useEffect(() => {
-    if (userData && rechargeHistory.length > 0) {
-      calculateIncome()
+    const loadPaymentDetails = async () => {
+      try {
+        const response = await fetch('/api/settings?key=paymentDetails')
+        if (response.ok) {
+          const data = await response.json()
+          if (data && data.value) {
+            setPaymentDetails(data.value)
+          } else {
+            // Default payment details
+            const defaultPaymentDetails = {
+              easypaisa: { number: '0300 1234567', accountName: 'Honda Civic Investment' },
+              jazzcash: { number: '0300 7654321', accountName: 'Honda Civic Investment' }
+            }
+            setPaymentDetails(defaultPaymentDetails)
+            // Save default to database
+            await fetch('/api/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                key: 'paymentDetails',
+                value: defaultPaymentDetails,
+                description: 'Payment method details'
+              })
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error loading payment details:', error)
+      }
     }
-  }, [rechargeHistory, withdrawHistory, userData])
+
+    loadPaymentDetails()
+  }, [])
+
+  // Load transaction history from database
+  const loadTransactionHistory = async (userId) => {
+    try {
+      const response = await fetch(`/api/transactions?userId=${userId}`)
+      if (response.ok) {
+        const transactions = await response.json()
+        const rechargeTxs = transactions.filter(tx => tx.type === 'recharge')
+        const withdrawTxs = transactions.filter(tx => tx.type === 'withdraw')
+        setRechargeHistory(rechargeTxs)
+        setWithdrawHistory(withdrawTxs)
+      }
+    } catch (error) {
+      console.error('Error loading transaction history:', error)
+    }
+  }
+
+  // Load team data from database
+  const loadTeamData = async (userId) => {
+    try {
+      const response = await fetch(`/api/user/team?userId=${userId}`)
+      if (response.ok) {
+        const teamData = await response.json()
+        setTeamSize(teamData.totalMembers || 0)
+      }
+    } catch (error) {
+      console.error('Error loading team data:', error)
+    }
+  }
+
+  // Parse investment amount from string (e.g., "$5,000" to 5000)
+  const parseInvestmentAmount = (amountString) => {
+    if (typeof amountString === 'number') return amountString
+    if (!amountString) return 0
+    
+    // Remove currency symbols and commas, then parse
+    const cleanAmount = amountString.replace(/[$,₹Rs]/g, '').replace(/,/g, '')
+    return parseFloat(cleanAmount) || 0
+  }
+
+  // Daily income system - check and add daily income every 24 hours
+  useEffect(() => {
+    if (!userData || !currentPlan) return
+    
+    const checkAndAddDailyIncome = async () => {
+      try {
+        const response = await fetch(`/api/user/balance`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            operation: 'check_daily_income',
+            userId: userData.phone,
+            planId: currentPlan._id
+          })
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          if (result.incomeAdded) {
+            setEarnBalance(result.newEarnBalance)
+            setBalance(result.newBalance)
+            showSuccess(`Daily income of ${result.incomeAmount} Rs added from ${currentPlan.planName}`)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking daily income:', error)
+      }
+    }
+    
+    // Check immediately when component mounts
+    checkAndAddDailyIncome()
+    
+    // Set up interval to check every hour (in case user keeps the page open)
+    const dailyIncomeInterval = setInterval(checkAndAddDailyIncome, 60 * 60 * 1000) // Check every hour
+    
+    return () => {
+      clearInterval(dailyIncomeInterval)
+    }
+  }, [userData, currentPlan, showSuccess])
 
   // Refresh all data when component mounts
   useEffect(() => {
@@ -90,118 +233,65 @@ export default function ProfilePage() {
     }, 100) // Small delay to ensure all data is loaded
     
     return () => clearTimeout(timer)
-  }, [userData])
+  }, [])
 
-  // Refresh all data
-  const refreshAllData = () => {
-    if (userData) {
-      // Refresh balance
-      const userBalance = localStorage.getItem(`userBalance_${userData.phone}`) || '0'
-      setBalance(parseFloat(userBalance))
+  const refreshAllData = async () => {
+    if (!userData) return
+    
+    try {
+      // Refresh user data
+      const user = await getCurrentUser()
+      if (user) {
+        setBalance(user.balance || 0)
+        setEarnBalance(user.earnBalance || 0)
+      }
       
-      // Refresh history
-      const storedRechargeHistory = localStorage.getItem('rechargeHistory') || '[]'
-      setRechargeHistory(JSON.parse(storedRechargeHistory))
+      // Refresh transaction history
+      await loadTransactionHistory(userData.phone)
       
-      const storedWithdrawHistory = localStorage.getItem('withdrawHistory') || '[]'
-      setWithdrawHistory(JSON.parse(storedWithdrawHistory))
+      // Refresh team data
+      await loadTeamData(userData.phone)
       
-      // Load investments
-      const storedInvestments = localStorage.getItem(`investmentHistory_${userData.phone}`) || '[]'
-      setInvestments(JSON.parse(storedInvestments))
-      
-      // Calculate income
-      calculateIncome()
+      // Refresh current plan
+      const response = await fetch('/api/user/investments?active=true')
+      if (response.ok) {
+        const investments = await response.json()
+        if (investments.length > 0) {
+          setCurrentPlan(investments[0])
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error)
     }
   }
 
-  // Calculate income from various sources
-  const calculateIncome = () => {
-    if (!userData) return
+  // Calculate income based on current plan and team
+  const calculateIncome = async () => {
+    if (!userData || !currentPlan) return
 
-    const today = new Date().toDateString()
-    let todayTotal = 0
-    let cumulativeTotal = 0
+    try {
+      // Calculate from current plan
+      const dailyIncomeAmount = parseInvestmentAmount(currentPlan.dailyIncome)
+      setTodayIncome(dailyIncomeAmount)
 
-    // Calculate from approved recharge requests (income from deposits)
-    const rechargeHistory = JSON.parse(localStorage.getItem('rechargeHistory') || '[]')
-    const userRecharges = rechargeHistory.filter(req => 
-      req.userId === userData.phone && req.status === 'approved'
-    )
-    
-    userRecharges.forEach(recharge => {
-      const rechargeDate = new Date(recharge.date).toDateString()
-      const amount = parseFloat(recharge.amount)
-      
-      if (rechargeDate === today) {
-        todayTotal += amount
+      // Calculate team income (3-tier referral system)
+      const response = await fetch(`/api/user/balance`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'calculate_team_income',
+          userId: userData.phone
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        // Team income is already added to earn balance in the backend
+        console.log('Team income calculated:', result)
       }
-      cumulativeTotal += amount
-    })
-
-    // Calculate from approved withdrawal requests (income from withdrawals)
-    const withdrawHistory = JSON.parse(localStorage.getItem('withdrawHistory') || '[]')
-    const userWithdrawals = withdrawHistory.filter(req => 
-      req.userId === userData.phone && req.status === 'approved'
-    )
-    
-    userWithdrawals.forEach(withdraw => {
-      const withdrawDate = new Date(withdraw.date).toDateString()
-      const amount = parseFloat(withdraw.amount)
-      
-      if (withdrawDate === today) {
-        todayTotal += amount
-      }
-      cumulativeTotal += amount
-    })
-
-    // Calculate from coupon redemptions
-    const usedCoupons = JSON.parse(localStorage.getItem('usedCoupons') || '[]')
-    const userCoupons = usedCoupons.filter(coupon => 
-      coupon.userPhone === userData.phone
-    )
-    
-    userCoupons.forEach(coupon => {
-      const couponDate = new Date(coupon.usedDate).toDateString()
-      const amount = parseFloat(coupon.bonusAmount)
-      
-      if (couponDate === today) {
-        todayTotal += amount
-      }
-      cumulativeTotal += amount
-    })
-
-    // Calculate from team earnings (referral bonuses)
-    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-    const teamMembers = registeredUsers.filter(user => 
-      user.referralCode === userData.phone
-    )
-    
-    teamMembers.forEach(member => {
-      const memberBalance = parseFloat(localStorage.getItem(`userBalance_${member.phone}`) || '0')
-      const memberWithdrawals = JSON.parse(localStorage.getItem(`withdrawHistory_${member.phone}`) || '[]')
-      const memberTotalWithdrawals = memberWithdrawals.reduce((sum, withdraw) => 
-        sum + (withdraw.status === 'approved' ? parseFloat(withdraw.amount) : 0), 0
-      )
-      
-      // Calculate 5% commission from team member's total activity
-      const memberTotalActivity = memberBalance + memberTotalWithdrawals
-      const commission = memberTotalActivity * 0.05
-      
-      cumulativeTotal += commission
-      
-      // Check if team member was active today
-      const todayActivity = memberWithdrawals.filter(withdraw => 
-        new Date(withdraw.date).toDateString() === today && withdraw.status === 'approved'
-      )
-      if (todayActivity.length > 0) {
-        todayTotal += commission * 0.1 // 10% of daily commission
-      }
-    })
-
-    setTodayIncome(todayTotal)
-    setCumulativeIncome(cumulativeTotal)
-    setTeamSize(teamMembers.length)
+    } catch (error) {
+      console.error('Error calculating income:', error)
+    }
   }
 
   const userInitial = userName.charAt(0).toUpperCase()
@@ -214,84 +304,73 @@ export default function ProfilePage() {
     }
   }
 
-  const handleRecharge = () => {
+  const handleRecharge = async () => {
     if (!rechargeAmount || parseFloat(rechargeAmount) <= 0) {
-      alert('Please enter a valid amount')
+      showError('Please enter a valid amount')
+      return
+    }
+
+    if (!userData) {
+      showError('Please log in to recharge')
       return
     }
 
     const amount = parseFloat(rechargeAmount)
-    const rechargeRequest = {
-      id: Date.now(),
-      userId: userData?.phone || userPhone,
-      userName: userName,
-      amount: amount,
-      status: 'pending',
-      date: new Date().toISOString(),
-      paymentMethod: selectedPaymentMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash',
-      paymentNumber: paymentDetails[selectedPaymentMethod].number,
-      paymentAccountName: paymentDetails[selectedPaymentMethod].accountName,
-      transactionId: `RCH${Date.now()}`
+    try {
+      await updateUserBalance(userData.phone, 'recharge', {
+        amount: amount,
+        paymentMethod: selectedPaymentMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash',
+        paymentNumber: paymentDetails[selectedPaymentMethod].number,
+        paymentAccountName: paymentDetails[selectedPaymentMethod].accountName
+      })
+
+      showSuccess(`Recharge request submitted for $${amount}. Admin will approve your payment.`)
+      setRechargeAmount('')
+      setShowRechargeModal(false)
+      // Refresh user data to show updated balance immediately
+      await refreshUserData()
+    } catch (error) {
+      showError(error.message || 'Recharge request failed')
     }
-
-    // Add to recharge history
-    const updatedRechargeHistory = [...rechargeHistory, rechargeRequest]
-    setRechargeHistory(updatedRechargeHistory)
-    localStorage.setItem('rechargeHistory', JSON.stringify(updatedRechargeHistory))
-
-    // Add to admin pending requests
-    const pendingRequests = JSON.parse(localStorage.getItem('pendingRechargeRequests') || '[]')
-    pendingRequests.push(rechargeRequest)
-    localStorage.setItem('pendingRechargeRequests', JSON.stringify(pendingRequests))
-
-    alert(`Recharge request submitted for $${amount}. Admin will approve your payment.`)
-    setRechargeAmount('')
-    setShowRechargeModal(false)
   }
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
+    // Check if user has purchased any investment plan
+    if (!currentPlan) {
+      showError('❌ Withdrawal Failed!\n\nYou must purchase an investment plan before you can withdraw.\n\nPlease go to the Invest page and buy a plan first.')
+      setShowWithdrawModal(false)
+      return
+    }
+
     if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
-      alert('Please enter a valid amount')
+      showError('Please enter a valid amount')
+      return
+    }
+
+    if (!userData) {
+      showError('Please log in to withdraw')
       return
     }
 
     const amount = parseFloat(withdrawAmount)
-    if (amount > balance) {
-      alert('Insufficient balance')
-      return
+
+    try {
+      await updateUserBalance(userData.phone, 'withdraw', {
+        amount: amount,
+        withdrawalMethod: selectedWithdrawMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash',
+        withdrawalNumber: paymentDetails[selectedWithdrawMethod].number,
+        withdrawalAccountName: withdrawAccountName
+      })
+
+      showSuccess(`Withdrawal request submitted for $${amount}. Admin will process your withdrawal.`)
+      setWithdrawAmount('')
+      setWithdrawAccountName('')
+      setShowWithdrawModal(false)
+      // Refresh user data to show updated balance immediately
+      await refreshUserData()
+    } catch (error) {
+      showError(error.message || 'Withdrawal request failed')
     }
-
-    const withdrawRequest = {
-      id: Date.now(),
-      userId: userData?.phone || userPhone,
-      userName: userName,
-      amount: amount,
-      status: 'pending',
-      date: new Date().toISOString(),
-      withdrawalMethod: selectedWithdrawMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash',
-      withdrawalNumber: paymentDetails[selectedWithdrawMethod].number,
-      withdrawalAccountName: withdrawAccountName,
-      transactionId: `WTH${Date.now()}`
-    }
-
-    // Add to withdraw history
-    const updatedWithdrawHistory = [...withdrawHistory, withdrawRequest]
-    setWithdrawHistory(updatedWithdrawHistory)
-    localStorage.setItem('withdrawHistory', JSON.stringify(updatedWithdrawHistory))
-
-    // Add to admin pending requests
-    const pendingRequests = JSON.parse(localStorage.getItem('pendingWithdrawRequests') || '[]')
-    pendingRequests.push(withdrawRequest)
-    localStorage.setItem('pendingWithdrawRequests', JSON.stringify(pendingRequests))
-
-    // Deduct from balance immediately (will be reversed if admin rejects)
-    const newBalance = balance - amount
-    setBalance(newBalance)
-    localStorage.setItem(`userBalance_${userData?.phone || userPhone}`, newBalance.toString())
-
-    alert(`Withdrawal request submitted for $${amount}. Admin will process your withdrawal.`)
-    setWithdrawAmount('')
-    setShowWithdrawModal(false)
   }
 
   const handleNavigation = (page) => {
@@ -337,6 +416,19 @@ export default function ProfilePage() {
               </svg>
               Premium Member
             </div>
+            
+            {/* Refresh Button */}
+            <div className="mb-6">
+              <button
+                onClick={refreshUserData}
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-full text-sm font-medium hover:bg-green-700 transition-colors"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh Data
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center">
                 <div className="bg-purple-100 rounded-xl p-4 mb-2">
@@ -357,20 +449,10 @@ export default function ProfilePage() {
                     </svg>
                   </div>
                   <p className="text-2xl font-bold text-purple-900">{investments.length}</p>
+                  <p className="text-sm text-gray-600">Investments</p>
                 </div>
-                <p className="text-sm text-gray-700">Investments</p>
               </div>
-              <div className="text-center">
-                <div className="bg-purple-600 rounded-xl p-4 mb-2">
-                  <div className="w-8 h-8 bg-purple-700 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                  </div>
-                  <p className="text-2xl font-bold text-white">Rs{balance.toFixed(2)}</p>
-                </div>
-                <p className="text-sm text-gray-700">Total Balance</p>
-              </div>
+
             </div>
             
             {/* Second Row - Team Size */}
@@ -383,8 +465,8 @@ export default function ProfilePage() {
                     </svg>
                   </div>
                   <p className="text-2xl font-bold text-purple-900">{teamSize}</p>
+                  <p className="text-sm text-gray-600">Team Size</p>
                 </div>
-                <p className="text-sm text-gray-700">Team Size</p>
               </div>
             </div>
           </div>
@@ -414,35 +496,30 @@ export default function ProfilePage() {
             
             {/* Right Side Cards */}
             <div className="flex flex-col gap-4 w-1/3">
-              {/* Today Income */}
+             
+              
+              {/* Earn Balance */}
               <div className="bg-white rounded-lg p-3 text-purple-900 relative overflow-hidden shadow-lg">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-purple-200 rounded-full -translate-y-6 translate-x-6 opacity-30"></div>
                 <div className="relative z-10">
-                  <p className="text-xs font-medium opacity-90">Today income</p>
-                  <p className="text-lg font-bold mt-1">Rs{todayIncome.toFixed(2)}</p>
+                  <p className="text-xs font-medium opacity-90">Earn Balance</p>
+                  <p className="text-lg font-bold mt-1">Rs{earnBalance.toFixed(2)}</p>
                 </div>
               </div>
               
-              {/* Cumulative Income */}
+              {/* Total Recharge */}
               <div className="bg-white rounded-lg p-3 text-purple-900 relative overflow-hidden shadow-lg">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-purple-200 rounded-full -translate-y-6 translate-x-6 opacity-30"></div>
                 <div className="relative z-10">
-                  <p className="text-xs font-medium opacity-90">Cumulative income</p>
-                  <p className="text-lg font-bold mt-1">Rs{cumulativeIncome.toFixed(2)}</p>
+                  <p className="text-xs font-medium opacity-90">Total Recharge</p>
+                  <p className="text-lg font-bold mt-1">Rs{totalRecharge.toFixed(2)}</p>
                 </div>
               </div>
             </div>
           </div>
           
-          {/* Additional Balance Cards - 4th Card */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-lg p-4 text-purple-900 relative overflow-hidden shadow-lg">
-              <div className="absolute top-0 right-0 w-16 h-16 bg-purple-200 rounded-full -translate-y-8 translate-x-8 opacity-30"></div>
-              <div className="relative z-10">
-                <p className="text-sm font-medium opacity-90">Total Recharge</p>
-                <p className="text-xl font-bold mt-1">Rs{rechargeHistory.filter(req => req.userId === userData?.phone && req.status === 'approved').reduce((sum, req) => sum + parseFloat(req.amount), 0).toFixed(2)}</p>
-              </div>
-            </div>
+          {/* Additional Balance Cards */}
+          <div className="grid grid-cols-1 gap-4 mb-6">
             <div className="bg-white rounded-lg p-4 text-purple-900 relative overflow-hidden shadow-lg">
               <div className="absolute top-0 right-0 w-16 h-16 bg-purple-200 rounded-full -translate-y-8 translate-x-8 opacity-30"></div>
               <div className="relative z-10">
@@ -450,6 +527,19 @@ export default function ProfilePage() {
                 <p className="text-xl font-bold mt-1">Rs{withdrawHistory.filter(req => req.userId === userData?.phone && req.status === 'approved').reduce((sum, req) => sum + parseFloat(req.amount), 0).toFixed(2)}</p>
               </div>
             </div>
+          </div>
+          
+          {/* Refresh Data Button */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={refreshUserData}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh Data
+            </button>
           </div>
           
           {/* Action Buttons */}
@@ -467,12 +557,19 @@ export default function ProfilePage() {
               
               {/* Withdraw Button */}
               <div className="flex flex-col items-center" onClick={() => setShowWithdrawModal(true)}>
-                <div className="w-16 h-16 bg-purple-600 rounded-lg flex items-center justify-center mb-2 hover:bg-purple-700 transition-colors cursor-pointer shadow-lg">
+                <div className={`w-16 h-16 rounded-lg flex items-center justify-center mb-2 transition-colors cursor-pointer shadow-lg ${
+                  currentPlan 
+                    ? 'bg-purple-600 hover:bg-purple-700' 
+                    : 'bg-gray-400 cursor-not-allowed'
+                }`}>
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
                 </div>
                 <span className="text-purple-900 text-sm font-medium">Withdraw</span>
+                {!currentPlan && (
+                  <span className="text-red-500 text-xs mt-1">Plan Required</span>
+                )}
               </div>
             </div>
           </div>

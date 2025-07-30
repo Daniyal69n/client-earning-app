@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useNotification } from '../context/NotificationContext'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const [formData, setFormData] = useState({
     phone: '',
     password: ''
@@ -55,39 +57,37 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Check if user exists in registeredUsers array
-      const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-      const user = registeredUsers.find(u => u.phone === formData.phone)
-      
-      if (user) {
-        // Check if user is blocked
-        if (user.isBlocked) {
-          alert('Your account has been blocked by admin. Please contact admin for support or email: support@hondacivicinvestment.com')
-          return
-        }
-        
-        // Check if password reset is required
-        if (user.passwordReset) {
-          alert('Password reset required. Please set a new password.')
-          // In a real app, you would redirect to password reset page
-          return
-        }
-        
-        // In a real app, you would verify the password with your backend
-        // For demo purposes, we'll just check if the phone matches
-        localStorage.setItem('userData', JSON.stringify(user))
-        localStorage.setItem('isLoggedIn', 'true')
-        alert('Login successful! Welcome back.')
-        router.push('/')
-      } else {
-        alert('No account found with this phone number. Please register first.')
+      // Call MongoDB login API
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: formData.phone,
+          password: formData.password
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed')
       }
+
+      // Store current user session in sessionStorage for this browser session only
+      sessionStorage.setItem('userData', JSON.stringify(data))
+      sessionStorage.setItem('userPhone', data.phone)
+      sessionStorage.setItem('isLoggedIn', 'true')
+      
+      // Show success message
+      showSuccess('Login successful! Welcome to Honda Civic Investment.')
+      
+      // Redirect to home page
+      router.push('/')
       
     } catch (error) {
-      alert('Login failed. Please try again.')
+      showError(error.message || 'Login failed. Please try again.')
     } finally {
       setIsLoading(false)
     }

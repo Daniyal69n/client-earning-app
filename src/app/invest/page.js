@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { useNotification } from '../context/NotificationContext'
+import { getCurrentUser } from '../../lib/api'
 
 export default function InvestPage() {
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const [userData, setUserData] = useState(null)
   const [userBalance, setUserBalance] = useState(0)
   const [showInsufficientModal, setShowInsufficientModal] = useState(false)
@@ -19,148 +22,167 @@ export default function InvestPage() {
     { text: "⭐ Top Quality", emoji: "⭐" }
   ]
 
-    const [civicModels, setCivicModels] = useState([])
+  const [civicModels, setCivicModels] = useState([])
 
   // Load user data and balance
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUserData = localStorage.getItem('userData')
-      if (storedUserData) {
-        const user = JSON.parse(storedUserData)
-        setUserData(user)
-        const balance = parseFloat(localStorage.getItem(`userBalance_${user.phone}`) || '0')
-        setUserBalance(balance)
+    const loadUserData = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (user) {
+          setUserData(user)
+          setUserBalance(user.balance || 0)
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error)
       }
     }
+
+    loadUserData()
   }, [])
 
-  // Load plans from localStorage (shared with admin dashboard)
+  // Load plans from database
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedPlans = localStorage.getItem('investmentPlans')
-      if (storedPlans) {
-        setCivicModels(JSON.parse(storedPlans))
-      } else {
-        // Default plans if none stored
-        const defaultPlans = [
-          {
-            id: 1,
-            name: 'Honda Civic Type R',
-            image: 'car1.jpeg',
-            investAmount: '$5,000',
-            dailyIncome: '$25',
-            validity: '200 days',
-            color: 'from-red-500 to-red-700',
-            description: 'High performance variant with turbocharged engine',
-            isActive: true
-          },
-          {
-            id: 2,
-            name: 'Honda Civic Sedan',
-            image: 'car2.jpeg',
-            investAmount: '$3,500',
-            dailyIncome: '$17.50',
-            validity: '200 days',
-            color: 'from-blue-500 to-blue-700',
-            description: 'Classic four-door model with excellent fuel economy',
-            isActive: true
-          },
-          {
-            id: 3,
-            name: 'Honda Civic Hatchback',
-            image: 'car3.jpeg',
-            investAmount: '$4,000',
-            dailyIncome: '$20',
-            validity: '200 days',
-            color: 'from-green-500 to-green-700',
-            description: 'Versatile hatchback with sporty styling and ample cargo space',
-            isActive: true
-          },
-          {
-            id: 4,
-            name: 'Honda Civic Si',
-            image: 'car4.jpeg',
-            investAmount: '$4,500',
-            dailyIncome: '$22.50',
-            validity: '200 days',
-            color: 'from-yellow-500 to-yellow-700',
-            description: 'Sport-injected model with enhanced performance features',
-            isActive: true
-          },
-          {
-            id: 5,
-            name: 'Honda Civic Hybrid',
-            image: 'car5.jpeg',
-            investAmount: '$4,200',
-            dailyIncome: '$21',
-            validity: '200 days',
-            color: 'from-purple-500 to-purple-700',
-            description: 'Eco-friendly hybrid with excellent fuel efficiency',
-            isActive: false
-          }
-        ]
-        setCivicModels(defaultPlans)
-        localStorage.setItem('investmentPlans', JSON.stringify(defaultPlans))
+    const loadPlans = async () => {
+      try {
+        const response = await fetch('/api/plans')
+        if (response.ok) {
+          const plans = await response.json()
+          setCivicModels(plans)
+        } else {
+          // Fallback to default plans if API fails
+          const defaultPlans = [
+            {
+              _id: 1,
+              name: 'Honda Civic Type R',
+              image: 'car1.jpeg',
+              investAmount: '$5,000',
+              dailyIncome: '$25',
+              validity: '200 days',
+              color: 'from-red-500 to-red-700',
+              description: 'High performance variant with turbocharged engine',
+              isActive: true
+            },
+            {
+              _id: 2,
+              name: 'Honda Civic Sedan',
+              image: 'car2.jpeg',
+              investAmount: '$3,500',
+              dailyIncome: '$17.50',
+              validity: '200 days',
+              color: 'from-blue-500 to-blue-700',
+              description: 'Classic four-door model with excellent fuel economy',
+              isActive: true
+            },
+            {
+              _id: 3,
+              name: 'Honda Civic Hatchback',
+              image: 'car3.jpeg',
+              investAmount: '$4,000',
+              dailyIncome: '$20',
+              validity: '200 days',
+              color: 'from-green-500 to-green-700',
+              description: 'Versatile hatchback with sporty styling and ample cargo space',
+              isActive: true
+            },
+            {
+              _id: 4,
+              name: 'Honda Civic Si',
+              image: 'car4.jpeg',
+              investAmount: '$4,500',
+              dailyIncome: '$22.50',
+              validity: '200 days',
+              color: 'from-yellow-500 to-yellow-700',
+              description: 'Sport-injected model with enhanced performance features',
+              isActive: true
+            },
+            {
+              _id: 5,
+              name: 'Honda Civic Hybrid',
+              image: 'car5.jpeg',
+              investAmount: '$4,200',
+              dailyIncome: '$21',
+              validity: '200 days',
+              color: 'from-purple-500 to-purple-700',
+              description: 'Eco-friendly hybrid with excellent fuel efficiency',
+              isActive: true
+            }
+          ]
+          setCivicModels(defaultPlans)
+        }
+      } catch (error) {
+        console.error('Error loading plans:', error)
       }
     }
+
+    loadPlans()
   }, [])
 
-  // Parse investment amount from string (e.g., "$5,000" -> 5000)
+  // Parse investment amount from string (e.g., "$5,000" to 5000)
   const parseInvestmentAmount = (amountString) => {
-    return parseFloat(amountString.replace(/[$,]/g, ''))
+    if (typeof amountString === 'number') return amountString
+    if (!amountString) return 0
+    
+    // Remove currency symbols and commas, then parse
+    const cleanAmount = amountString.replace(/[$,₹Rs]/g, '').replace(/,/g, '')
+    return parseFloat(cleanAmount) || 0
   }
 
-  const handleInvest = (modelId) => {
-    // Find the selected model
-    const selectedModel = civicModels.find(model => model.id === modelId)
-    
+  const handleInvest = async (modelId) => {
     if (!userData) {
-      alert('Please log in to invest in plans')
+      showError('Please log in to invest')
       return
     }
+
+    const selectedModel = civicModels.find(model => model._id === modelId)
+    if (!selectedModel) {
+      showError('Selected plan not found')
+      return
+    }
+
+    const investAmount = parseInvestmentAmount(selectedModel.investAmount)
     
-    // Parse investment amount
-    const investmentAmount = parseInvestmentAmount(selectedModel.investAmount)
-    
-    // Check if user has sufficient balance
-    if (userBalance < investmentAmount) {
+    if (userBalance < investAmount) {
       setSelectedPlan(selectedModel)
       setShowInsufficientModal(true)
       return
     }
-    
-    // Deduct investment amount from balance
-    const newBalance = userBalance - investmentAmount
-    localStorage.setItem(`userBalance_${userData.phone}`, newBalance.toString())
-    setUserBalance(newBalance)
-    
-    // Store the plan in localStorage for persistence with investment date
-    const planWithDate = {
-      ...selectedModel,
-      investDate: new Date().toISOString()
+
+    try {
+      // Create investment in database
+      const response = await fetch('/api/user/investments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userData.phone,
+          planId: selectedModel._id,
+          planName: selectedModel.name,
+          investAmount: selectedModel.investAmount,
+          dailyIncome: selectedModel.dailyIncome,
+          validity: selectedModel.validity,
+          investDate: new Date().toISOString()
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        
+        // Update user balance
+        const newBalance = userBalance - investAmount
+        setUserBalance(newBalance)
+        
+        showSuccess(`🎉 Investment successful! You have purchased ${selectedModel.name} for ${selectedModel.investAmount}. Daily income: ${selectedModel.dailyIncome}`)
+        
+        // Redirect to home page to see the investment
+        window.location.href = '/'
+      } else {
+        const errorData = await response.json()
+        showError(errorData.message || 'Investment failed')
+      }
+    } catch (error) {
+      console.error('Error making investment:', error)
+      showError('Investment failed. Please try again.')
     }
-    localStorage.setItem('currentPlan', JSON.stringify(planWithDate))
-    
-    // Add investment to user's investment history
-    const investmentHistory = JSON.parse(localStorage.getItem(`investmentHistory_${userData.phone}`) || '[]')
-    const investment = {
-      id: Date.now(),
-      planId: selectedModel.id,
-      planName: selectedModel.name,
-      amount: investmentAmount,
-      dailyIncome: parseInvestmentAmount(selectedModel.dailyIncome),
-      validity: selectedModel.validity,
-      investDate: new Date().toISOString(),
-      status: 'active'
-    }
-    investmentHistory.push(investment)
-    localStorage.setItem(`investmentHistory_${userData.phone}`, JSON.stringify(investmentHistory))
-    
-    // Show success message
-    alert(`Successfully invested in ${selectedModel.name}! Your plan is now active.`)
-    
-    // Redirect to home page to see the current plan
-    window.location.href = '/'
   }
 
   return (
@@ -220,7 +242,7 @@ export default function InvestPage() {
           {/* Car Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {civicModels.filter(model => model.isActive).map((model) => (
-              <div key={model.id} className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative" style={{ boxShadow: 'rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px' }}>
+              <div key={model._id} className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative" style={{ boxShadow: 'rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px' }}>
                 {/* HOT Badge */}
                 <div className="absolute top-3 right-3 z-10">
                   <div className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
@@ -262,7 +284,7 @@ export default function InvestPage() {
                   </div>
                   
                   <button 
-                    onClick={() => handleInvest(model.id)}
+                    onClick={() => handleInvest(model._id)}
                     className={`w-full py-3 rounded-lg bg-gradient-to-r ${model.color} text-white font-bold hover:opacity-90 transition-all flex items-center justify-center space-x-2`}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

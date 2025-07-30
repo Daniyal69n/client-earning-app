@@ -2,15 +2,31 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useNotification } from '../context/NotificationContext'
 
 export default function AdminPage() {
   const router = useRouter()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false)
   const [formData, setFormData] = useState({
     username: '',
     password: ''
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+
+  // Check if admin is already logged in
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const adminLoginStatus = sessionStorage.getItem('isAdminLoggedIn')
+      if (adminLoginStatus === 'true') {
+        setIsAdminLoggedIn(true)
+        router.push('/admin/dashboard')
+      }
+      setIsCheckingAuth(false)
+    }
+  }, [router])
 
 
 
@@ -55,8 +71,8 @@ export default function AdminPage() {
     try {
       // Simple admin authentication
       if (formData.username === 'admin' && formData.password === 'admin123') {
-        localStorage.setItem('isAdminLoggedIn', 'true')
-        localStorage.setItem('adminData', JSON.stringify({
+        sessionStorage.setItem('isAdminLoggedIn', 'true')
+        sessionStorage.setItem('adminData', JSON.stringify({
           username: formData.username,
           role: 'admin',
           loginTime: new Date().toISOString()
@@ -65,14 +81,31 @@ export default function AdminPage() {
         // Redirect directly to dashboard
         router.push('/admin/dashboard')
       } else {
-        alert('Invalid admin credentials. Please try again.')
+        showError('Invalid admin credentials. Please try again.')
         setIsLoading(false)
       }
       
     } catch (error) {
-      alert('Login failed. Please try again.')
+      showError('Login failed. Please try again.')
       setIsLoading(false)
     }
+  }
+
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-white">Checking admin access...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render if already logged in (will redirect)
+  if (isAdminLoggedIn) {
+    return null
   }
 
   return (

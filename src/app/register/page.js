@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useNotification } from '../context/NotificationContext'
 
 export default function RegisterPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -84,36 +86,35 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // Store user data in localStorage (in a real app, this would be sent to your backend)
-      const userData = {
-        name: formData.name,
-        phone: formData.phone,
-        referralCode: formData.referralCode || null,
-        registrationDate: new Date().toISOString(),
-        isBlocked: false,
-        passwordReset: false
+      // Call MongoDB registration API
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          password: formData.password,
+          email: `${formData.phone}@hondacivic.com`, // Generate email from phone
+          referralCode: formData.referralCode || null
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed')
       }
-      
-      // Save to registeredUsers array for admin dashboard
-      const existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-      const updatedUsers = [...existingUsers, userData]
-      localStorage.setItem('registeredUsers', JSON.stringify(updatedUsers))
-      
-      // Store current user session
-      localStorage.setItem('userData', JSON.stringify(userData))
-      localStorage.setItem('isLoggedIn', 'true')
-      
+
       // Show success message
-      alert('Registration successful! Welcome to Honda Civic Investment.')
+      showSuccess('Registration successful! Please login with your credentials.')
       
-      // Redirect to home page
-      router.push('/')
+      // Redirect to login page
+      router.push('/login')
       
     } catch (error) {
-      alert('Registration failed. Please try again.')
+      showError(error.message || 'Registration failed. Please try again.')
     } finally {
       setIsLoading(false)
     }

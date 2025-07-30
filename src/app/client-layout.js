@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { NotificationProvider, useNotification } from './context/NotificationContext'
 
-export default function ClientLayout({ children }) {
+function ClientLayoutContent({ children }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const [activeNav, setActiveNav] = useState('home')
   const [userName, setUserName] = useState('John Doe')
   const [userPhone, setUserPhone] = useState('+92 300 1234567')
@@ -15,30 +17,47 @@ export default function ClientLayout({ children }) {
 
             // Check authentication on component mount
           useEffect(() => {
-            const checkAuth = () => {
-              const loginStatus = localStorage.getItem('isLoggedIn')
-              const userData = localStorage.getItem('userData')
+            const checkAuth = async () => {
+              const loginStatus = sessionStorage.getItem('isLoggedIn')
+              const userData = sessionStorage.getItem('userData')
 
               if (loginStatus === 'true' && userData) {
                 const user = JSON.parse(userData)
                 
-                // Check if user is blocked
-                const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-                const currentUser = registeredUsers.find(u => u.phone === user.phone)
-                
-                if (currentUser && currentUser.isBlocked) {
-                  // User is blocked, log them out immediately
-                  localStorage.removeItem('isLoggedIn')
-                  localStorage.removeItem('userData')
-                  alert('Your account has been blocked. Please contact admin for support.')
-                  router.push('/login')
-                  setIsLoading(false)
-                  return
+                // Check if user is blocked from database
+                try {
+                  const response = await fetch(`/api/user/profile?phone=${user.phone}`)
+                  if (response.ok) {
+                    const currentUser = await response.json()
+                    
+                    if (currentUser.isBlocked) {
+                      // User is blocked, log them out immediately
+                      sessionStorage.removeItem('isLoggedIn')
+                      sessionStorage.removeItem('userData')
+                      sessionStorage.removeItem('userPhone')
+                      showError('Your account has been blocked. Please contact admin for support.')
+                      router.push('/login')
+                      setIsLoading(false)
+                      return
+                    }
+                    
+                    setUserName(currentUser.name || 'John Doe')
+                    setUserPhone(currentUser.phone || '+92 300 1234567')
+                    setIsLoggedIn(true)
+                  } else {
+                    // User not found in database, log them out
+                    sessionStorage.removeItem('isLoggedIn')
+                    sessionStorage.removeItem('userData')
+                    sessionStorage.removeItem('userPhone')
+                    router.push('/login')
+                  }
+                } catch (error) {
+                  console.error('Error checking user status:', error)
+                  // On error, still allow access but log the error
+                  setUserName(user.name || 'John Doe')
+                  setUserPhone(user.phone || '+92 300 1234567')
+                  setIsLoggedIn(true)
                 }
-                
-                setUserName(user.name || 'John Doe')
-                setUserPhone(user.phone || '+92 300 1234567')
-                setIsLoggedIn(true)
               } else {
                 // Redirect to login if not authenticated and not already on login/register pages or admin pages
                 if (!pathname.includes('/login') && !pathname.includes('/register') && !pathname.includes('/admin')) {
@@ -52,7 +71,7 @@ export default function ClientLayout({ children }) {
             if (typeof window !== 'undefined') {
               checkAuth()
             }
-          }, [pathname, router])
+          }, [pathname, router, showError])
 
   // Update active navigation based on current pathname
   useEffect(() => {
@@ -69,7 +88,11 @@ export default function ClientLayout({ children }) {
 
   // Don't render the main layout for login/register pages or admin pages
   if (pathname.includes('/login') || pathname.includes('/register') || pathname.includes('/admin')) {
-    return <>{children}</>
+    return (
+    <NotificationProvider>
+      {children}
+    </NotificationProvider>
+  )
   }
 
   // Show loading spinner while checking auth
@@ -122,25 +145,34 @@ export default function ClientLayout({ children }) {
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                <span className="text-purple-600 font-bold text-lg">{userInitial}</span>
+                <span className="text-indigo-600 font-bold text-lg">{userInitial}</span>
               </div>
               <div>
-                <p className="text-sm opacity-90">Logged in as</p>
-                <p className="font-semibold">{userName}</p>
+                <h1 className="text-xl font-bold">Welcome, {userName}</h1>
+                <p className="text-purple-200 text-sm">{userPhone}</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-lg font-bold">Welcome Back!</p>
-              <p className="text-sm opacity-90">{userPhone}</p>
+            
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => {
+                  localStorage.removeItem('isLoggedIn')
+                  localStorage.removeItem('userData')
+                  router.push('/login')
+                }}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <div className="pb-24">
+      <main className="flex-1 pb-24">
         {children}
-      </div>
+      </main>
 
       {/* Bottom Navigation Footer */}
       <footer className="fixed z-999 bottom-0 left-0 right-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-purple-700 shadow-lg rounded-t-3xl">
@@ -203,5 +235,15 @@ export default function ClientLayout({ children }) {
         </div>
       </footer>
     </div>
+  )
+}
+
+export default function ClientLayout({ children }) {
+  return (
+    <NotificationProvider>
+      <ClientLayoutContent>
+        {children}
+      </ClientLayoutContent>
+    </NotificationProvider>
   )
 }
