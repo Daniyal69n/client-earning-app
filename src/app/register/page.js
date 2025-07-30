@@ -1,56 +1,47 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useNotification } from '../context/NotificationContext'
 
-export default function RegisterPage() {
+// Create a component to handle search params with Suspense
+function RegisterForm() {
   const router = useRouter()
-  const { showSuccess, showError, showWarning, showInfo } = useNotification()
-  const [searchParams, setSearchParams] = useState(null)
+  const { showSuccess, showError } = useNotification()
+  const searchParams = useSearchParams() // Use Next.js useSearchParams hook
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     password: '',
     confirmPassword: '',
-    referralCode: ''
+    referralCode: '',
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
 
-  // Get search params safely on client side
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      setSearchParams(params)
-    }
-  }, [])
-
   // Handle referral code from URL
   useEffect(() => {
-    if (searchParams) {
-      const refCode = searchParams.get('ref')
-      if (refCode) {
-        setFormData(prev => ({
-          ...prev,
-          referralCode: refCode
-        }))
-      }
+    const refCode = searchParams.get('ref')
+    if (refCode) {
+      setFormData((prev) => ({
+        ...prev,
+        referralCode: refCode,
+      }))
     }
   }, [searchParams])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }))
     // Clear error when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        [name]: ''
+        [name]: '',
       }))
     }
   }
@@ -88,7 +79,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
@@ -106,8 +97,8 @@ export default function RegisterPage() {
           name: formData.name,
           phone: formData.phone,
           password: formData.password,
-          email: `${formData.phone}@hondacivic.com`, // Generate email from phone
-          referralCode: formData.referralCode || null
+          email: `${formData.phone}@hondacivic.com`,
+          referralCode: formData.referralCode || null,
         }),
       })
 
@@ -117,12 +108,8 @@ export default function RegisterPage() {
         throw new Error(data.error || 'Registration failed')
       }
 
-      // Show success message
       showSuccess('Registration successful! Please login with your credentials.')
-      
-      // Redirect to login page
       router.push('/login')
-      
     } catch (error) {
       showError(error.message || 'Registration failed. Please try again.')
     } finally {
@@ -307,4 +294,12 @@ export default function RegisterPage() {
       </div>
     </div>
   )
-} 
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <RegisterForm />
+    </Suspense>
+  )
+}
