@@ -21,12 +21,14 @@ export default function RegisterPage() {
 
   // Handle referral code from URL
   useEffect(() => {
-    const refCode = searchParams.get('ref')
-    if (refCode) {
-      setFormData(prev => ({
-        ...prev,
-        referralCode: refCode
-      }))
+    if (typeof window !== 'undefined' && searchParams) {
+      const refCode = searchParams.get('ref')
+      if (refCode) {
+        setFormData(prev => ({
+          ...prev,
+          referralCode: refCode
+        }))
+      }
     }
   }, [searchParams])
 
