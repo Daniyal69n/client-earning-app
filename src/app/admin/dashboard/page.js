@@ -1667,9 +1667,7 @@ export default function AdminDashboard() {
                           <p className="text-sm text-gray-600">Phone: {request.userId}</p>
                           <p className="text-sm text-gray-600">Amount: ${request.amount}</p>
                           <p className="text-sm text-gray-600">Payment Method: {request.paymentMethod}</p>
-                          {request.userTransactionId && (
-                            <p className="text-sm text-blue-600">User Transaction ID: {request.userTransactionId}</p>
-                          )}
+                          <p className="text-sm text-blue-600">User Transaction ID: {request.userTransactionId || 'Not provided'}</p>
                           <p className="text-xs text-gray-500">System Transaction ID: {request.transactionId}</p>
                           <p className="text-xs text-gray-500">Date: {new Date(request.date).toLocaleString()}</p>
                         </div>
