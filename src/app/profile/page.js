@@ -27,6 +27,7 @@ export default function ProfilePage() {
     jazzcash: { number: '', accountName: '' }
   })
   const [withdrawAccountName, setWithdrawAccountName] = useState('')
+  const [withdrawAccountNumber, setWithdrawAccountNumber] = useState('')
   
   // Income tracking states
   const [todayIncome, setTodayIncome] = useState(0)
@@ -361,7 +362,7 @@ export default function ProfilePage() {
       await updateUserBalance(userData.phone, 'withdraw', {
         amount: amount,
         withdrawalMethod: selectedWithdrawMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash',
-        withdrawalNumber: paymentDetails[selectedWithdrawMethod].number,
+        withdrawalNumber: withdrawAccountNumber.trim() || paymentDetails[selectedWithdrawMethod].number,
         withdrawalAccountName: withdrawAccountName
       })
 
@@ -714,8 +715,8 @@ export default function ProfilePage() {
               <h4 className="text-sm font-medium text-gray-700 mb-2">Payment Details</h4>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-xl text-gray-600">Account Number:</span>
-                  <span className="text-xl font-medium text-gray-800">
+                  <span className="text-xl font-semibold text-gray-600">Account Number:</span>
+                  <span className="text-xl font-semibold text-gray-800">
                     {paymentDetails[selectedPaymentMethod].number}
                   </span>
                 </div>
@@ -785,7 +786,7 @@ export default function ProfilePage() {
                   }`}
                 >
                   <div className="text-base font-semibold">EasyPaisa</div>
-                  <div className="text-xs text-gray-600">Receive to: {paymentDetails.easypaisa.number}</div>
+                  <div className="text-xs text-gray-600">Default: {paymentDetails.easypaisa.number || 'Not set'}</div>
                 </button>
                 <button
                   type="button"
@@ -797,7 +798,7 @@ export default function ProfilePage() {
                 }`}
                 >
                   <div className="text-base font-semibold">JazzCash</div>
-                  <div className="text-xs text-gray-600">Receive to: {paymentDetails.jazzcash.number}</div>
+                  <div className="text-xs text-gray-600">Default: {paymentDetails.jazzcash.number || 'Not set'}</div>
                 </button>
               </div>
             </div>
@@ -807,12 +808,12 @@ export default function ProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
               <input
                 type="text"
-                value={paymentDetails[selectedWithdrawMethod].number}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
-                placeholder="Account number"
-                readOnly
+                value={withdrawAccountNumber}
+                onChange={(e) => setWithdrawAccountNumber(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
+                placeholder={paymentDetails[selectedWithdrawMethod].number || "Enter account number"}
               />
-              <p className="text-xs text-gray-500 mt-1">This is your registered account number</p>
+              <p className="text-xs text-gray-500 mt-1">Enter your account number or leave empty to use registered number</p>
             </div>
 
             {/* Account Holder Name */}
@@ -843,7 +844,7 @@ export default function ProfilePage() {
             <div className="flex space-x-3">
               <button
                 onClick={handleWithdraw}
-                disabled={!withdrawAccountName.trim()}
+                disabled={!withdrawAccountName.trim() || (!withdrawAccountNumber.trim() && !paymentDetails[selectedWithdrawMethod].number)}
                 className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Submit Withdrawal
@@ -852,6 +853,7 @@ export default function ProfilePage() {
                 onClick={() => {
                   setShowWithdrawModal(false)
                   setWithdrawAccountName('')
+                  setWithdrawAccountNumber('')
                   setWithdrawAmount('')
                 }}
                 className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors"
