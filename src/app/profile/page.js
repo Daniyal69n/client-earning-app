@@ -683,30 +683,28 @@ export default function ProfilePage() {
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedPaymentMethod('easypaisa')}
-                  className={`p-3 border rounded-lg text-center transition-colors ${
-                    selectedPaymentMethod === 'easypaisa'
-                      ? 'border-purple-500 bg-purple-50 text-purple-700'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="text-lg font-semibold">EasyPaisa</div>
-                  <div className="text-sm text-gray-600">Send to: {paymentDetails.easypaisa.number}</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPaymentMethod('jazzcash')}
-                  className={`p-3 border rounded-lg text-center transition-colors ${
-                    selectedPaymentMethod === 'jazzcash'
-                      ? 'border-purple-500 bg-purple-50 text-purple-700'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="text-lg font-semibold">JazzCash</div>
-                  <div className="text-sm text-gray-600">Send to: {paymentDetails.jazzcash.number}</div>
-                </button>
+                                 <button
+                   type="button"
+                   onClick={() => setSelectedPaymentMethod('easypaisa')}
+                   className={`p-3 border rounded-lg text-center transition-colors ${
+                     selectedPaymentMethod === 'easypaisa'
+                       ? 'border-purple-500 bg-purple-50 text-purple-700'
+                       : 'border-gray-300 hover:border-gray-400'
+                   }`}
+                 >
+                   <div className="text-lg font-semibold">EasyPaisa</div>
+                 </button>
+                 <button
+                   type="button"
+                   onClick={() => setSelectedPaymentMethod('jazzcash')}
+                   className={`p-3 border rounded-lg text-center transition-colors ${
+                     selectedPaymentMethod === 'jazzcash'
+                       ? 'border-purple-500 bg-purple-50 text-purple-700'
+                       : 'border-gray-300 hover:border-gray-400'
+                   }`}
+                 >
+                   <div className="text-lg font-semibold">JazzCash</div>
+                 </button>
               </div>
             </div>
 
@@ -786,7 +784,6 @@ export default function ProfilePage() {
                   }`}
                 >
                   <div className="text-base font-semibold">EasyPaisa</div>
-                  <div className="text-xs text-gray-600">Default: {paymentDetails.easypaisa.number || 'Not set'}</div>
                 </button>
                 <button
                   type="button"
@@ -798,7 +795,6 @@ export default function ProfilePage() {
                 }`}
                 >
                   <div className="text-base font-semibold">JazzCash</div>
-                  <div className="text-xs text-gray-600">Default: {paymentDetails.jazzcash.number || 'Not set'}</div>
                 </button>
               </div>
             </div>
