@@ -35,6 +35,13 @@ export default function AdminDashboard() {
   const [showAddCoupon, setShowAddCoupon] = useState(false)
   const [usedCoupons, setUsedCoupons] = useState([])
 
+  // History states
+  const [rechargeHistory, setRechargeHistory] = useState([])
+  const [withdrawHistory, setWithdrawHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [rechargeFilter, setRechargeFilter] = useState('all') // all, approved, rejected, pending
+  const [withdrawFilter, setWithdrawFilter] = useState('all') // all, approved, rejected, pending
+
   // Sample plans data - in a real app, this would come from your backend
   const [samplePlans, setSamplePlans] = useState([])
 
@@ -427,12 +434,54 @@ export default function AdminDashboard() {
           console.error('Error loading pending requests:', error)
         }
       }
+
+      // Load recharge history
+      const loadRechargeHistory = async () => {
+        try {
+          setHistoryLoading(true)
+          const response = await fetch('/api/transactions?type=recharge&status=all')
+          if (response.ok) {
+            const data = await response.json()
+            setRechargeHistory(data)
+          } else {
+            console.error('Failed to load recharge history')
+            setRechargeHistory([])
+          }
+        } catch (error) {
+          console.error('Error loading recharge history:', error)
+          setRechargeHistory([])
+        } finally {
+          setHistoryLoading(false)
+        }
+      }
+
+      // Load withdraw history
+      const loadWithdrawHistory = async () => {
+        try {
+          setHistoryLoading(true)
+          const response = await fetch('/api/transactions?type=withdraw&status=all')
+          if (response.ok) {
+            const data = await response.json()
+            setWithdrawHistory(data)
+          } else {
+            console.error('Failed to load withdraw history')
+            setWithdrawHistory([])
+          }
+        } catch (error) {
+          console.error('Error loading withdraw history:', error)
+          setWithdrawHistory([])
+        } finally {
+          setHistoryLoading(false)
+        }
+      }
       
       // Load all data
       loadUsers()
       loadPaymentDetails()
       loadCoupons()
       loadPendingRequests()
+      loadRechargeHistory()
+      loadWithdrawHistory()
       
       // Set up periodic refresh every 30 seconds
       const refreshInterval = setInterval(() => {
@@ -440,6 +489,8 @@ export default function AdminDashboard() {
         loadPaymentDetails()
         loadCoupons()
         loadPendingRequests()
+        loadRechargeHistory()
+        loadWithdrawHistory()
       }, 30000)
       
       return () => {
@@ -447,6 +498,106 @@ export default function AdminDashboard() {
       }
     }
   }, [isAdminLoggedIn, isCheckingAuth])
+
+  // Load recharge history when tab is activated
+  useEffect(() => {
+    if (isAdminLoggedIn && !isCheckingAuth && activeTab === 'rechargeHistory') {
+      const loadRechargeHistory = async () => {
+        try {
+          setHistoryLoading(true)
+          const response = await fetch('/api/transactions?type=recharge&status=all')
+          if (response.ok) {
+            const data = await response.json()
+            setRechargeHistory(data)
+          } else {
+            console.error('Failed to load recharge history')
+            setRechargeHistory([])
+          }
+        } catch (error) {
+          console.error('Error loading recharge history:', error)
+          setRechargeHistory([])
+        } finally {
+          setHistoryLoading(false)
+        }
+      }
+      loadRechargeHistory()
+    }
+  }, [isAdminLoggedIn, isCheckingAuth, activeTab])
+
+  // Load withdraw history when tab is activated
+  useEffect(() => {
+    if (isAdminLoggedIn && !isCheckingAuth && activeTab === 'withdrawHistory') {
+      const loadWithdrawHistory = async () => {
+        try {
+          setHistoryLoading(true)
+          const response = await fetch('/api/transactions?type=withdraw&status=all')
+          if (response.ok) {
+            const data = await response.json()
+            setWithdrawHistory(data)
+          } else {
+            console.error('Failed to load withdraw history')
+            setWithdrawHistory([])
+          }
+        } catch (error) {
+          console.error('Error loading withdraw history:', error)
+          setWithdrawHistory([])
+        } finally {
+          setHistoryLoading(false)
+        }
+      }
+      loadWithdrawHistory()
+    }
+  }, [isAdminLoggedIn, isCheckingAuth, activeTab])
+
+  // Manual refresh functions
+  const refreshRechargeHistory = async () => {
+    try {
+      setHistoryLoading(true)
+      const response = await fetch('/api/transactions?type=recharge&status=all')
+      if (response.ok) {
+        const data = await response.json()
+        setRechargeHistory(data)
+        showSuccess('Recharge history refreshed successfully')
+      } else {
+        showError('Failed to refresh recharge history')
+      }
+    } catch (error) {
+      console.error('Error refreshing recharge history:', error)
+      showError('Error refreshing recharge history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const refreshWithdrawHistory = async () => {
+    try {
+      setHistoryLoading(true)
+      const response = await fetch('/api/transactions?type=withdraw&status=all')
+      if (response.ok) {
+        const data = await response.json()
+        setWithdrawHistory(data)
+        showSuccess('Withdraw history refreshed successfully')
+      } else {
+        showError('Failed to refresh withdraw history')
+      }
+    } catch (error) {
+      console.error('Error refreshing withdraw history:', error)
+      showError('Error refreshing withdraw history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  // Filter functions
+  const getFilteredRechargeHistory = () => {
+    if (rechargeFilter === 'all') return rechargeHistory
+    return rechargeHistory.filter(transaction => transaction.status === rechargeFilter)
+  }
+
+  const getFilteredWithdrawHistory = () => {
+    if (withdrawFilter === 'all') return withdrawHistory
+    return withdrawHistory.filter(transaction => transaction.status === withdrawFilter)
+  }
 
   // Handle recharge approval
   const handleRechargeApproval = async (requestId, approved) => {
@@ -899,6 +1050,26 @@ export default function AdminDashboard() {
               }`}
             >
               Coupon Management
+            </button>
+            <button
+              onClick={() => setActiveTab('rechargeHistory')}
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                activeTab === 'rechargeHistory'
+                  ? 'text-purple-600 border-b-2 border-purple-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Recharge History
+            </button>
+            <button
+              onClick={() => setActiveTab('withdrawHistory')}
+              className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                activeTab === 'withdrawHistory'
+                  ? 'text-purple-600 border-b-2 border-purple-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Withdraw History
             </button>
           </div>
         </div>
@@ -2028,6 +2199,352 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Recharge History Tab */}
+        {activeTab === 'rechargeHistory' && (
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-gray-800">Recharge History</h3>
+              <div className="flex items-center space-x-2">
+                {historyLoading && (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                )}
+                <span className="text-sm text-gray-600">
+                  Total: {getFilteredRechargeHistory().length} transactions
+                </span>
+                <select
+                  value={rechargeFilter}
+                  onChange={(e) => setRechargeFilter(e.target.value)}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                <button
+                  onClick={refreshRechargeHistory}
+                  disabled={historyLoading}
+                  className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm text-green-600 font-medium">Total Recharges</p>
+                    <p className="text-lg font-bold text-green-800">{rechargeHistory.length}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Approved</p>
+                    <p className="text-lg font-bold text-blue-800">
+                      {rechargeHistory.filter(t => t.status === 'approved').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm text-yellow-600 font-medium">Pending</p>
+                    <p className="text-lg font-bold text-yellow-800">
+                      {rechargeHistory.filter(t => t.status === 'pending').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm text-red-600 font-medium">Rejected</p>
+                    <p className="text-lg font-bold text-red-800">
+                      {rechargeHistory.filter(t => t.status === 'rejected').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {getFilteredRechargeHistory().length === 0 ? (
+              <div className="text-center py-8">
+                {historyLoading ? (
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                ) : (
+                  <p className="text-gray-500">No recharge transactions found</p>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">User</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Amount</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Payment Method</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Transaction ID</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getFilteredRechargeHistory().map((transaction) => (
+                      <tr key={transaction._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <div>
+                            <div className="font-medium text-gray-800">{transaction.userName || 'Unknown'}</div>
+                            <div className="text-sm text-gray-500">{transaction.userId}</div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-green-600">Rs{transaction.amount}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-sm text-gray-600">{transaction.paymentMethod}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="space-y-1">
+                            {transaction.userTransactionId && (
+                              <div className="text-xs text-blue-600">
+                                User ID: {transaction.userTransactionId}
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-500">
+                              System: {transaction.transactionId}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            transaction.status === 'approved' 
+                              ? 'bg-green-100 text-green-800' 
+                              : transaction.status === 'rejected'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {transaction.status === 'approved' ? 'Approved' : 
+                             transaction.status === 'rejected' ? 'Rejected' : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-sm text-gray-600">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </span>
+                          <div className="text-xs text-gray-500">
+                            {new Date(transaction.date).toLocaleTimeString()}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Withdraw History Tab */}
+        {activeTab === 'withdrawHistory' && (
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-gray-800">Withdraw History</h3>
+              <div className="flex items-center space-x-2">
+                {historyLoading && (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                )}
+                <span className="text-sm text-gray-600">
+                  Total: {getFilteredWithdrawHistory().length} transactions
+                </span>
+                <select
+                  value={withdrawFilter}
+                  onChange={(e) => setWithdrawFilter(e.target.value)}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                <button
+                  onClick={refreshWithdrawHistory}
+                  disabled={historyLoading}
+                  className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm text-red-600 font-medium">Total Withdrawals</p>
+                    <p className="text-lg font-bold text-red-800">{withdrawHistory.length}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Approved</p>
+                    <p className="text-lg font-bold text-blue-800">
+                      {withdrawHistory.filter(t => t.status === 'approved').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm text-yellow-600 font-medium">Pending</p>
+                    <p className="text-lg font-bold text-yellow-800">
+                      {withdrawHistory.filter(t => t.status === 'pending').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm text-red-600 font-medium">Rejected</p>
+                    <p className="text-lg font-bold text-red-800">
+                      {withdrawHistory.filter(t => t.status === 'rejected').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {getFilteredWithdrawHistory().length === 0 ? (
+              <div className="text-center py-8">
+                {historyLoading ? (
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                ) : (
+                  <p className="text-gray-500">No withdraw transactions found</p>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">User</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Amount</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Method</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Account Details</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getFilteredWithdrawHistory().map((transaction) => (
+                      <tr key={transaction._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <div>
+                            <div className="font-medium text-gray-800">{transaction.userName || 'Unknown'}</div>
+                            <div className="text-sm text-gray-500">{transaction.userId}</div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-red-600">Rs{transaction.amount}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-sm text-gray-600">{transaction.withdrawalMethod}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="space-y-1">
+                            <div className="text-sm text-gray-800">
+                              {transaction.withdrawalAccountName}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {transaction.withdrawalNumber || 'No account number'}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            transaction.status === 'approved' 
+                              ? 'bg-green-100 text-green-800' 
+                              : transaction.status === 'rejected'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {transaction.status === 'approved' ? 'Approved' : 
+                             transaction.status === 'rejected' ? 'Rejected' : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-sm text-gray-600">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </span>
+                          <div className="text-xs text-gray-500">
+                            {new Date(transaction.date).toLocaleTimeString()}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
