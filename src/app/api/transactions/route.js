@@ -21,7 +21,7 @@ export async function GET(request) {
       query.type = type;
     }
     
-    if (status) {
+    if (status && status !== 'all') {
       query.status = status;
     }
     
