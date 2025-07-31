@@ -47,7 +47,12 @@ export async function POST(request) {
       phone,
       password,
       email,
-      referralCode: referralCode || null
+      referralCode: referralCode || null,
+      investmentPlans: [],
+      rechargeHistory: [],
+      withdrawHistory: [],
+      couponHistory: [],
+      teamMembers: []
     });
 
     await user.save();
