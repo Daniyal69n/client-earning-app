@@ -699,12 +699,6 @@ export default function ProfilePage() {
               <h4 className="text-sm font-medium text-gray-700 mb-2">Payment Details</h4>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Account Name:</span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {paymentDetails[selectedPaymentMethod].accountName}
-                  </span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Account Number:</span>
                   <span className="text-sm font-medium text-gray-800">
                     {paymentDetails[selectedPaymentMethod].number}
