@@ -39,8 +39,7 @@ export default function Page() {
   const [earnBalance, setEarnBalance] = useState(0)
   const [totalRecharge, setTotalRecharge] = useState(0)
   
-  // Cancel plan modal state
-  const [showCancelPlanModal, setShowCancelPlanModal] = useState(false)
+
   
   // Remaining days state
   const [remainingDays, setRemainingDays] = useState(0)
@@ -568,27 +567,7 @@ export default function Page() {
     }
   }
 
-  const handleCancelPlan = () => {
-    setShowCancelPlanModal(true)
-  }
 
-  const confirmCancelPlan = async () => {
-    if (!currentPlan || !userData) return
-    
-    try {
-      await updateUserBalance(userData.phone, 'cancel_plan', {
-        planId: currentPlan._id
-      })
-      
-      // Remove current plan from local state
-      setCurrentPlan(null)
-      
-      setShowCancelPlanModal(false)
-      showSuccess('✅ Your investment plan has been cancelled successfully.')
-    } catch (error) {
-      showError(error.message || 'Failed to cancel plan')
-    }
-  }
 
   const handleCouponRedeem = async () => {
     if (!couponCode.trim()) {
@@ -927,18 +906,7 @@ export default function Page() {
                   <p className="font-bold text-lg text-purple-900">{currentPlan.validity}</p>
                 </div>
                 
-                {/* Cancel Plan Button */}
-                <div className="mt-4">
-                  <button
-                    onClick={handleCancelPlan}
-                    className="w-full bg-red-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    <span>Cancel Plan</span>
-                  </button>
-                </div>
+
               </div>
             ) : (
               <div className="bg-gray-50 rounded-lg p-6 text-center border-2 border-dashed border-gray-300">
@@ -1245,80 +1213,7 @@ export default function Page() {
         </div>
       )}
 
-      {/* Cancel Plan Confirmation Modal */}
-      {showCancelPlanModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">Cancel Investment Plan</h3>
-              <p className="text-gray-600 text-sm">Are you sure you want to cancel your current plan?</p>
-            </div>
 
-            {/* Warning Message */}
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-start">
-                <svg className="w-5 h-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <div>
-                  <h4 className="text-sm font-medium text-red-800 mb-1">Important Notice:</h4>
-                  <ul className="text-xs text-red-700 space-y-1">
-                    <li>• Payment cannot be refunded</li>
-                    <li>• Plan will be immediately deactivated</li>
-                    <li>• You will lose access to daily income from this plan</li>
-                    <li>• You can purchase a new plan anytime</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Plan Details */}
-            {currentPlan && (
-              <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <h4 className="text-sm font-medium text-gray-800 mb-3">Plan Details:</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Plan:</span>
-                    <span className="font-medium">{currentPlan.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Investment:</span>
-                    <span className="font-medium text-red-600">{currentPlan.investAmount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Daily Income:</span>
-                    <span className="font-medium text-green-600">{currentPlan.dailyIncome}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Days Remaining:</span>
-                    <span className="font-medium">{remainingDays} days</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex space-x-3">
-              <button
-                onClick={confirmCancelPlan}
-                className="flex-1 bg-red-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-red-700 transition-colors"
-              >
-                Yes, Cancel Plan
-              </button>
-              <button
-                onClick={() => setShowCancelPlanModal(false)}
-                className="flex-1 bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors"
-              >
-                Keep Plan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style jsx global>{`
         @keyframes scroll {
