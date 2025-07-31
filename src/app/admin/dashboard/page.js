@@ -1758,17 +1758,6 @@ export default function AdminDashboard() {
                       placeholder="0300 1234567"
                     />
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Holder Name</label>
-                    <input
-                      type="text"
-                      value={paymentDetails.easypaisa.accountName}
-                      onChange={(e) => handleUpdatePaymentDetails('easypaisa', 'accountName', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                      placeholder="Honda Civic Investment"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -1790,17 +1779,6 @@ export default function AdminDashboard() {
                       onChange={(e) => handleUpdatePaymentDetails('jazzcash', 'number', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
                       placeholder="0300 7654321"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Holder Name</label>
-                    <input
-                      type="text"
-                      value={paymentDetails.jazzcash.accountName}
-                      onChange={(e) => handleUpdatePaymentDetails('jazzcash', 'accountName', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                      placeholder="Honda Civic Investment"
                     />
                   </div>
                 </div>
