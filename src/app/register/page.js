@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useNotification } from '../context/NotificationContext'
 
-// Component to handle form logic with useSearchParams
+// Create a component to handle search params with Suspense
 function RegisterForm() {
   const router = useRouter()
   const { showSuccess, showError } = useNotification()
-  const searchParams = useSearchParams() // Use Next.js useSearchParams hook
+  const [referralCode, setReferralCode] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -22,14 +22,18 @@ function RegisterForm() {
 
   // Handle referral code from URL
   useEffect(() => {
-    const refCode = searchParams.get('ref')
-    if (refCode) {
-      setFormData((prev) => ({
-        ...prev,
-        referralCode: refCode,
-      }))
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const refCode = urlParams.get('ref')
+      if (refCode) {
+        setReferralCode(refCode)
+        setFormData((prev) => ({
+          ...prev,
+          referralCode: refCode,
+        }))
+      }
     }
-  }, [searchParams])
+  }, [])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -37,6 +41,7 @@ function RegisterForm() {
       ...prev,
       [name]: value,
     }))
+    // Clear error when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -86,6 +91,7 @@ function RegisterForm() {
     setIsLoading(true)
 
     try {
+      // Call MongoDB registration API
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
@@ -118,6 +124,7 @@ function RegisterForm() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-white rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
             <svg className="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,8 +134,11 @@ function RegisterForm() {
           <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
           <p className="text-purple-100">Join Honda Civic Investment today</p>
         </div>
+
+        {/* Registration Form */}
         <div className="bg-white rounded-2xl p-8 shadow-xl" style={{ boxShadow: 'rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px' }}>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Full Name */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name
@@ -145,12 +155,16 @@ function RegisterForm() {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 text-black border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full pl-10 pr-4 py-3 text-black border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
+                    errors.name ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="Enter your full name"
                 />
               </div>
               {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
             </div>
+
+            {/* Phone Number */}
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
                 Phone Number
@@ -167,12 +181,16 @@ function RegisterForm() {
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 text-black border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full pl-10 pr-4 py-3 text-black border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
+                    errors.phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="+92 300 1234567"
                 />
               </div>
               {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
             </div>
+
+            {/* Password */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
@@ -189,12 +207,16 @@ function RegisterForm() {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 text-black border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full pl-10 pr-4 py-3 text-black border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
+                    errors.password ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="Create a password"
                 />
               </div>
               {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
             </div>
+
+            {/* Confirm Password */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
                 Confirm Password
@@ -211,12 +233,16 @@ function RegisterForm() {
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-4 py-3 text-black border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full pl-10 pr-4 py-3 text-black border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${
+                    errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="Confirm your password"
                 />
               </div>
               {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
             </div>
+
+            {/* Referral Code (Optional) */}
             <div>
               <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700 mb-2">
                 Referral Code <span className="text-gray-500">(Optional)</span>
@@ -238,6 +264,8 @@ function RegisterForm() {
                 />
               </div>
             </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -256,6 +284,8 @@ function RegisterForm() {
               )}
             </button>
           </form>
+
+          {/* Login Link */}
           <div className="mt-6 text-center">
             <p className="text-gray-600">
               Already have an account?{' '}
@@ -270,20 +300,6 @@ function RegisterForm() {
   )
 }
 
-// Main page component with Suspense boundary
 export default function RegisterPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400">
-          <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        </div>
-      }
-    >
-      <RegisterForm />
-    </Suspense>
-  )
+  return <RegisterForm />
 }
