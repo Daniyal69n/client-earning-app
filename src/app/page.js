@@ -18,6 +18,7 @@ export default function Page() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
   const [rechargeAmount, setRechargeAmount] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [transactionId, setTransactionId] = useState('')
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('easypaisa')
   const [selectedWithdrawMethod, setSelectedWithdrawMethod] = useState('easypaisa')
   const [withdrawAccountName, setWithdrawAccountName] = useState('')
@@ -498,11 +499,13 @@ export default function Page() {
         amount: amount,
         paymentMethod: selectedPaymentMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash',
         paymentNumber: paymentDetails[selectedPaymentMethod].number,
-        paymentAccountName: paymentDetails[selectedPaymentMethod].accountName
+        paymentAccountName: paymentDetails[selectedPaymentMethod].accountName,
+        transactionId: transactionId.trim()
       })
 
       showSuccess(`Recharge request submitted for $${amount}. Admin will approve your payment.`)
       setRechargeAmount('')
+      setTransactionId('')
       setShowRechargeModal(false)
     } catch (error) {
       showError(error.message || 'Recharge request failed')
@@ -975,6 +978,18 @@ export default function Page() {
                 placeholder="Enter amount"
                 min="1"
                 step="0.01"
+              />
+            </div>
+
+            {/* Transaction ID Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction ID (Optional)</label>
+              <input
+                type="text"
+                value={transactionId}
+                onChange={(e) => setTransactionId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
+                placeholder="Enter transaction ID from payment app"
               />
             </div>
 
