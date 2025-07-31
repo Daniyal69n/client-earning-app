@@ -53,6 +53,7 @@ export async function PUT(request) {
           description: `Recharge request via ${data.paymentMethod}`,
           paymentMethod: data.paymentMethod,
           paymentAccountName: data.paymentAccountName,
+          userTransactionId: data.transactionId || null,
           transactionId: 'TXN' + Date.now() + Math.random().toString(36).substr(2, 9).toUpperCase()
         });
         
