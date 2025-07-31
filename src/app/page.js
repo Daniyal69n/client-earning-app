@@ -11,7 +11,7 @@ export default function Page() {
   const [currentCarSlide, setCurrentCarSlide] = useState(0)
   const [activeNav, setActiveNav] = useState('home')
   const [userName] = useState('John Doe') // You can make this dynamic later
-  const [currentPlan, setCurrentPlan] = useState(null) // Store user's current plan
+  const [currentPlans, setCurrentPlans] = useState([]) // Store user's current plan
   
   // Modal states
   const [showRechargeModal, setShowRechargeModal] = useState(false)
@@ -111,45 +111,39 @@ export default function Page() {
           totalRecharge: user.totalRecharge || 0
         });
         
-        // Load current plan from database
+        // Load current plans from database
         const response = await fetch(`/api/user/investments?active=true&userId=${user.phone}`)
         if (response.ok) {
           const investments = await response.json()
           if (investments.length > 0) {
-            const activeInvestment = investments[0]
+            console.log('Active investments found:', investments)
             
-            // The user investment doesn't have image data, so we need to fetch the plan template
-            console.log('Active investment with plan data:', activeInvestment)
-            console.log('Plan image field:', activeInvestment.image)
-            console.log('Plan name:', activeInvestment.planName)
-            
-            // Fetch the plan template to get the image
+            // Fetch the plan templates to get the images
             const planResponse = await fetch('/api/plans')
             if (planResponse.ok) {
               const plans = await planResponse.json()
               console.log('Available plans:', plans)
               
-              // Find the plan by name since planId might not match
-              const planTemplate = plans.find(plan => plan.name === activeInvestment.planName)
-              console.log('Found plan template by name:', planTemplate)
-              
-              if (planTemplate) {
-                // Merge plan template data with user investment data
-                const completePlan = {
-                  ...activeInvestment,
-                  image: planTemplate.image,
-                  color: planTemplate.color,
-                  description: planTemplate.description
+              // Process each investment and merge with plan template data
+              const completePlans = investments.map(investment => {
+                const planTemplate = plans.find(plan => plan.name === investment.planName)
+                if (planTemplate) {
+                  return {
+                    ...investment,
+                    image: planTemplate.image,
+                    color: planTemplate.color,
+                    description: planTemplate.description
+                  }
+                } else {
+                  return investment
                 }
-                console.log('Complete plan with image:', completePlan)
-                setCurrentPlan(completePlan)
-              } else {
-                console.log('Plan template not found by name, using investment data only')
-                setCurrentPlan(activeInvestment)
-              }
+              })
+              
+              console.log('Complete plans with images:', completePlans)
+              setCurrentPlans(completePlans)
             } else {
               console.log('Failed to fetch plans')
-              setCurrentPlan(activeInvestment)
+              setCurrentPlans(investments)
             }
           }
         }
@@ -205,22 +199,25 @@ export default function Page() {
     
     const checkAndAddDailyIncome = async () => {
       try {
-        const response = await fetch(`/api/user/balance`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            operation: 'check_daily_income',
-            userId: userData.phone,
-            planId: currentPlan._id
+        // Check daily income for all active plans
+        for (const plan of currentPlans) {
+          const response = await fetch(`/api/user/balance`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              operation: 'check_daily_income',
+              userId: userData.phone,
+              planId: plan._id
+            })
           })
-        })
 
-        if (response.ok) {
-          const result = await response.json()
-          if (result.incomeAdded) {
-            setEarnBalance(result.newEarnBalance)
-            setUserBalance(result.newBalance)
-            showSuccess(`Daily income of ${result.incomeAmount} Rs added from ${currentPlan.planName}`)
+          if (response.ok) {
+            const result = await response.json()
+            if (result.incomeAdded) {
+              setEarnBalance(result.newEarnBalance)
+              setUserBalance(result.newBalance)
+              showSuccess(`Daily income of ${result.incomeAmount} Rs added from ${plan.planName}`)
+            }
           }
         }
       } catch (error) {
@@ -237,7 +234,7 @@ export default function Page() {
     return () => {
       clearInterval(dailyIncomeInterval)
     }
-  }, [userData, currentPlan, showSuccess])
+  }, [userData, currentPlans, showSuccess])
   
   // Check if plan is expired based on validity period
   const isPlanExpired = (plan) => {
@@ -342,12 +339,16 @@ export default function Page() {
 
   // Calculate income based on current plan and team
   const calculateIncome = async () => {
-    if (!userData || !currentPlan) return
+    if (!userData || currentPlans.length === 0) return
 
     try {
-      // Calculate from current plan
-      const dailyIncomeAmount = parseInvestmentAmount(currentPlan.dailyIncome)
-      setTodayIncome(dailyIncomeAmount)
+      // Calculate from all active plans
+      let totalDailyIncome = 0
+      currentPlans.forEach(plan => {
+        const dailyIncomeAmount = parseInvestmentAmount(plan.dailyIncome)
+        totalDailyIncome += dailyIncomeAmount
+      })
+      setTodayIncome(totalDailyIncome)
 
       // Calculate team income (3-tier referral system)
       const response = await fetch(`/api/user/balance`, {
@@ -374,69 +375,18 @@ export default function Page() {
     if (userData) {
       calculateIncome()
     }
-  }, [userData])
-  
-  // Sync current plan with updated investment plans from admin
-  useEffect(() => {
-    if (!currentPlan) return
-    
-    const syncCurrentPlan = async () => {
-      try {
-        const response = await fetch('/api/plans')
-        if (response.ok) {
-          const investmentPlans = await response.json()
-          const updatedPlan = investmentPlans.find(plan => plan._id === currentPlan._id)
-          
-          if (updatedPlan) {
-            // Update current plan with latest data from admin, but preserve user-specific data
-            const updatedCurrentPlan = {
-              ...updatedPlan,
-              investDate: currentPlan.investDate, // Preserve user's investment date
-              userSpecificData: currentPlan.userSpecificData // Preserve any user-specific data
-            }
-            
-            // Only update if there are actual changes
-            if (JSON.stringify(updatedCurrentPlan) !== JSON.stringify(currentPlan)) {
-              await fetch(`/api/plans?id=${currentPlan._id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedCurrentPlan)
-              })
-              setCurrentPlan(updatedCurrentPlan)
-              showSuccess(`Your plan "${currentPlan.name}" has been updated with latest admin changes.`)
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error syncing current plan:', error)
-      }
-    }
-    
-    // Sync immediately
-    syncCurrentPlan()
-    
-    // Listen for storage changes (when admin updates investment plans)
-    const handleStorageChange = (e) => {
-      if (e.key === 'investmentPlans') {
-        syncCurrentPlan()
-      }
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-    }
-  }, [currentPlan])
+  }, [userData, currentPlans])
   
   // Update remaining days display periodically
   useEffect(() => {
-    if (!currentPlan) return
+    if (currentPlans.length === 0) return
     
     const updateRemainingDays = () => {
-      const daysLeft = getRemainingDays(currentPlan)
-      setRemainingDays(daysLeft)
-      console.log(`Plan: ${currentPlan.planName}, Validity: ${currentPlan.validity}, Days Left: ${daysLeft}`)
+      // Calculate total remaining days from all plans (for display purposes, show the minimum)
+      const allRemainingDays = currentPlans.map(plan => getRemainingDays(plan))
+      const minRemainingDays = Math.min(...allRemainingDays)
+      setRemainingDays(minRemainingDays)
+      console.log(`Plans: ${currentPlans.length}, Min Days Left: ${minRemainingDays}`)
     }
     
     // Update immediately
@@ -448,7 +398,7 @@ export default function Page() {
     return () => {
       clearInterval(interval)
     }
-  }, [currentPlan])
+  }, [currentPlans])
 
   const nextCarSlide = () => {
     setCurrentCarSlide((prev) => (prev + 1) % totalCarSlides)
@@ -835,95 +785,101 @@ export default function Page() {
             </button>
           </div>
           
-          {/* Your Current Plan Section */}
+          {/* Your Current Plans Section */}
         <div className="bg-white rounded-lg p-6 mb-6" style={{ boxShadow: 'rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px' }}>
             <h3 className="text-lg font-bold text-purple-900 mb-4 flex items-center">
               <svg className="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Your Current Plan
+              Your Active Plans ({currentPlans.length})
             </h3>
             
-            {currentPlan ? (
-              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
-                {/* Plan Image */}
-                <div className="relative h-32 mb-4 rounded-lg overflow-hidden bg-gray-200 flex items-center justify-center">
-                  <img 
-                    src={currentPlan.image ? `/${currentPlan.image}` : '/car1.jpeg'} 
-                    alt={currentPlan.name || 'Plan Image'}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      console.log('Image failed to load:', currentPlan.image)
-                      console.log('Full image src:', e.target.src)
-                      e.target.src = '/car1.jpeg'
-                    }}
-                    onLoad={() => {
-                      console.log('Image loaded successfully:', currentPlan.image)
-                    }}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-bold text-purple-900">{currentPlan.name}</h4>
-                  <div className="flex items-center space-x-2">
-                    <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
-                      Active
-                    </span>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      remainingDays <= 7 
-                        ? 'bg-red-100 text-red-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {remainingDays} days left
-                    </span>
-                  </div>
-                </div>
-                {remainingDays <= 7 && remainingDays > 0 && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                      </svg>
-                      <p className="text-sm text-yellow-800">
-                        <strong>Plan Expiring Soon!</strong> Your plan will expire in {remainingDays} days. Consider renewing or investing in a new plan.
-                      </p>
+            {currentPlans.length > 0 ? (
+              <div className="space-y-4">
+                {currentPlans.map((plan, index) => {
+                  const planRemainingDays = getRemainingDays(plan)
+                  return (
+                    <div key={plan._id || index} className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                      {/* Plan Image */}
+                      <div className="relative h-32 mb-4 rounded-lg overflow-hidden bg-gray-200 flex items-center justify-center">
+                        <img 
+                          src={plan.image ? `/${plan.image}` : '/car1.jpeg'} 
+                          alt={plan.planName || 'Plan Image'}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            console.log('Image failed to load:', plan.image)
+                            console.log('Full image src:', e.target.src)
+                            e.target.src = '/car1.jpeg'
+                          }}
+                          onLoad={() => {
+                            console.log('Image loaded successfully:', plan.image)
+                          }}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-lg font-bold text-purple-900">{plan.planName}</h4>
+                        <div className="flex items-center space-x-2">
+                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
+                            Active
+                          </span>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                            planRemainingDays <= 7 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {planRemainingDays} days left
+                          </span>
+                        </div>
+                      </div>
+                      {planRemainingDays <= 7 && planRemainingDays > 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                          <div className="flex items-center">
+                            <svg className="w-4 h-4 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                            <p className="text-sm text-yellow-800">
+                              <strong>Plan Expiring Soon!</strong> Your plan will expire in {planRemainingDays} days. Consider renewing or investing in a new plan.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-gray-600 text-sm mb-3">{plan.description}</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Investment Amount</p>
+                          <p className="font-bold text-lg text-purple-900">{plan.investAmount}</p>
+                        </div>
+                        <div className="bg-white rounded-lg p-3">
+                          <p className="text-xs text-gray-500">Daily Income</p>
+                          <p className="font-bold text-lg text-green-600">{plan.dailyIncome}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 bg-white rounded-lg p-3">
+                        <p className="text-xs text-gray-500">Validity Period</p>
+                        <p className="font-bold text-lg text-purple-900">{plan.validity}</p>
+                      </div>
+                      
+                      {/* Running Plan Indicator */}
+                      <div className="mt-4">
+                        <div className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold flex items-center justify-center space-x-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span>Running Plan</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
-                <p className="text-gray-600 text-sm mb-3">{currentPlan.description}</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white rounded-lg p-3">
-                    <p className="text-xs text-gray-500">Investment Amount</p>
-                    <p className="font-bold text-lg text-purple-900">{currentPlan.investAmount}</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3">
-                    <p className="text-xs text-gray-500">Daily Income</p>
-                    <p className="font-bold text-lg text-green-600">{currentPlan.dailyIncome}</p>
-                  </div>
-                </div>
-                <div className="mt-3 bg-white rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Validity Period</p>
-                  <p className="font-bold text-lg text-purple-900">{currentPlan.validity}</p>
-                </div>
-                
-                {/* Running Plan Indicator */}
-                <div className="mt-4">
-                  <div className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold flex items-center justify-center space-x-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    <span>Running Plan</span>
-                  </div>
-                </div>
-
+                  )
+                })}
               </div>
             ) : (
               <div className="bg-gray-50 rounded-lg p-6 text-center border-2 border-dashed border-gray-300">
                 <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <h4 className="text-lg font-medium text-gray-600 mb-2">No Current Plan</h4>
-                <p className="text-gray-500 text-sm mb-4">You haven't purchased any investment plan yet.</p>
+                <h4 className="text-lg font-medium text-gray-600 mb-2">No Active Plans</h4>
+                <p className="text-gray-500 text-sm mb-4">You haven't purchased any investment plans yet.</p>
                 <button 
                   onClick={() => handleNavigation('invest')}
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
