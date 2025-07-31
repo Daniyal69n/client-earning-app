@@ -1008,7 +1008,6 @@ export default function Page() {
                   }`}
                 >
                   <div className="text-lg font-semibold">EasyPaisa</div>
-                  <div className="text-sm text-gray-600">Send to: {paymentDetails.easypaisa.number}</div>
                 </button>
                 <button
                   type="button"
@@ -1020,7 +1019,6 @@ export default function Page() {
                   }`}
                 >
                   <div className="text-lg font-semibold">JazzCash</div>
-                  <div className="text-sm text-gray-600">Send to: {paymentDetails.jazzcash.number}</div>
                 </button>
               </div>
             </div>
@@ -1100,7 +1098,6 @@ export default function Page() {
                 }`}
                 >
                   <div className="text-base font-semibold">EasyPaisa</div>
-                  <div className="text-xs text-gray-600">Default: {paymentDetails.easypaisa.number || 'Not set'}</div>
                 </button>
                 <button
                   type="button"
@@ -1112,7 +1109,6 @@ export default function Page() {
                 }`}
                 >
                   <div className="text-base font-semibold">JazzCash</div>
-                  <div className="text-xs text-gray-600">Default: {paymentDetails.jazzcash.number || 'Not set'}</div>
                 </button>
               </div>
             </div>
