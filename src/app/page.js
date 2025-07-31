@@ -195,7 +195,7 @@ export default function Page() {
   
   // Daily income system - check and add daily income every 24 hours
   useEffect(() => {
-    if (!userData || !currentPlan) return
+    if (!userData || currentPlans.length === 0) return
     
     const checkAndAddDailyIncome = async () => {
       try {
@@ -320,22 +320,18 @@ export default function Page() {
     return result
   }
 
-  // Update remaining days when current plan changes
+  // Update remaining days when current plans change
   useEffect(() => {
-    if (currentPlan) {
-      const days = getRemainingDays(currentPlan)
-      setRemainingDays(days)
-      
-      // Check if plan is expired
-      if (isPlanExpired(currentPlan)) {
-        // Plan is expired, remove it and show no plan message
-        setCurrentPlan(null)
-        showWarning('Your investment plan has expired')
+    if (currentPlans.length > 0) {
+      // Check if any plan is expired
+      const expiredPlans = currentPlans.filter(plan => isPlanExpired(plan))
+      if (expiredPlans.length > 0) {
+        showWarning('Some of your investment plans have expired')
       }
     } else {
       setRemainingDays(0)
     }
-  }, [currentPlan, showWarning])
+  }, [currentPlans, showWarning])
 
   // Calculate income based on current plan and team
   const calculateIncome = async () => {
@@ -464,7 +460,7 @@ export default function Page() {
 
   const handleWithdrawSubmit = async () => {
     // Check if user has purchased any investment plan
-    if (!currentPlan) {
+    if (currentPlans.length === 0) {
       showError('❌ Withdrawal Failed!\n\nYou must purchase an investment plan before you can withdraw.\n\nPlease go to the Invest page and buy a plan first.')
       setShowWithdrawModal(false)
       return
@@ -668,7 +664,7 @@ export default function Page() {
                         <div 
                 onClick={handleWithdraw}
                 className={`flex-1 p-1 rounded-lg shadow-lg transition-all duration-300 flex flex-col items-center cursor-pointer overflow-hidden ${
-                  currentPlan 
+                  currentPlans.length > 0
                     ? 'bg-purple-600 text-white hover:shadow-xl hover:-translate-y-1' 
                     : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                 }`}
@@ -680,7 +676,7 @@ export default function Page() {
                 </div>
                 <div className="p-2 text-center">
                   <span className="font-medium">Withdraw</span>
-                  {!currentPlan && (
+                  {currentPlans.length === 0 && (
                     <div className="text-xs mt-1 opacity-75">Plan Required</div>
                   )}
                 </div>
