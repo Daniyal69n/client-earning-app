@@ -68,7 +68,7 @@ export async function POST(request) {
       withdrawalMethod: transactionData.withdrawalMethod,
       withdrawalAccountName: transactionData.withdrawalAccountName,
       withdrawalNumber: transactionData.withdrawalNumber,
-      transactionId: transactionData.transactionId
+      userTransactionId: transactionData.transactionId || null
     };
     
     // Create transaction
