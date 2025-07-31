@@ -648,7 +648,34 @@ export default function AdminDashboard() {
       }
     }
     setPaymentDetails(updatedPaymentDetails)
-    localStorage.setItem('paymentDetails', JSON.stringify(updatedPaymentDetails))
+  }
+
+  // Handle saving payment details to database
+  const handleSavePaymentDetails = async () => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: 'paymentDetails',
+          value: paymentDetails,
+          description: 'Payment method details for user recharges'
+        }),
+      })
+
+      if (response.ok) {
+        showSuccess('Payment settings saved successfully!')
+        localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails))
+      } else {
+        const error = await response.json()
+        showError(error.message || 'Failed to save payment settings')
+      }
+    } catch (error) {
+      console.error('Error saving payment settings:', error)
+      showError('Failed to save payment settings')
+    }
   }
 
   // Coupon management functions
@@ -1780,12 +1807,21 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleSavePaymentDetails}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors"
+              >
+                Save Payment Settings
+              </button>
+            </div>
+
             <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h4 className="text-sm font-medium text-blue-800 mb-2">💡 Payment Settings Info:</h4>
               <ul className="text-sm text-blue-700 space-y-1">
                 <li>• These details will be shown to users when they recharge</li>
                 <li>• Users can choose between EasyPaisa and JazzCash</li>
-                <li>• Changes are saved automatically</li>
+                <li>• Click "Save Payment Settings" to save changes</li>
                 <li>• Make sure account numbers are correct and active</li>
               </ul>
             </div>
