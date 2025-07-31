@@ -59,6 +59,10 @@ const transactionSchema = new mongoose.Schema({
   paymentNumber: {
     type: String
   },
+  userTransactionId: {
+    type: String,
+    default: null
+  },
   // For coupon redeem
   couponCode: {
     type: String
