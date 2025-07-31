@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://dk3205997146:earning123@earning.vxoyttm.mongodb.net/?retryWrites=true&w=majority&appName=earning';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://dk3205997146:earning123@earning.vxoyttm.mongodb.net/earning?retryWrites=true&w=majority&appName=earning';
 
 if (!MONGODB_URI) {
   throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
@@ -21,8 +21,9 @@ async function connectDB() {
     const opts = {
       bufferCommands: false,
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
     };
 
     console.log('Attempting to connect to MongoDB...');
