@@ -22,6 +22,7 @@ export default function Page() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('easypaisa')
   const [selectedWithdrawMethod, setSelectedWithdrawMethod] = useState('easypaisa')
   const [withdrawAccountName, setWithdrawAccountName] = useState('')
+  const [withdrawAccountNumber, setWithdrawAccountNumber] = useState('')
   const [paymentDetails, setPaymentDetails] = useState({
     easypaisa: { number: '', accountName: '' },
     jazzcash: { number: '', accountName: '' }
@@ -536,7 +537,7 @@ export default function Page() {
       await updateUserBalance(userData.phone, 'withdraw', {
         amount: amount,
         withdrawalMethod: selectedWithdrawMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash',
-        withdrawalNumber: paymentDetails[selectedWithdrawMethod].number,
+        withdrawalNumber: withdrawAccountNumber.trim() || paymentDetails[selectedWithdrawMethod].number,
         withdrawalAccountName: withdrawAccountName
       })
 
@@ -1089,17 +1090,17 @@ export default function Page() {
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">Withdrawal Method</label>
               <div className="grid grid-cols-2 gap-2">
-                <button
+                                <button
                   type="button"
                   onClick={() => setSelectedWithdrawMethod('easypaisa')}
                   className={`p-2 border rounded-lg text-center transition-colors ${
                     selectedWithdrawMethod === 'easypaisa'
                       ? 'border-purple-500 bg-purple-50 text-purple-700'
                       : 'border-gray-300 hover:border-gray-400'
-                  }`}
+                }`}
                 >
                   <div className="text-base font-semibold">EasyPaisa</div>
-                  <div className="text-xs text-gray-600">Receive to: {paymentDetails.easypaisa.number}</div>
+                  <div className="text-xs text-gray-600">Default: {paymentDetails.easypaisa.number || 'Not set'}</div>
                 </button>
                 <button
                   type="button"
@@ -1111,7 +1112,7 @@ export default function Page() {
                 }`}
                 >
                   <div className="text-base font-semibold">JazzCash</div>
-                  <div className="text-xs text-gray-600">Receive to: {paymentDetails.jazzcash.number}</div>
+                  <div className="text-xs text-gray-600">Default: {paymentDetails.jazzcash.number || 'Not set'}</div>
                 </button>
               </div>
             </div>
@@ -1121,12 +1122,12 @@ export default function Page() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
               <input
                 type="text"
-                value={paymentDetails[selectedWithdrawMethod].number}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
-                placeholder="Account number"
-                readOnly
+                value={withdrawAccountNumber}
+                onChange={(e) => setWithdrawAccountNumber(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
+                placeholder={paymentDetails[selectedWithdrawMethod].number || "Enter account number"}
               />
-              <p className="text-xs text-gray-500 mt-1">This is your registered account number</p>
+              <p className="text-xs text-gray-500 mt-1">Enter your account number or leave empty to use registered number</p>
             </div>
 
             {/* Account Holder Name */}
@@ -1157,7 +1158,7 @@ export default function Page() {
             <div className="flex space-x-3">
               <button
                 onClick={handleWithdrawSubmit}
-                disabled={!withdrawAccountName.trim()}
+                disabled={!withdrawAccountName.trim() || (!withdrawAccountNumber.trim() && !paymentDetails[selectedWithdrawMethod].number)}
                 className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Submit Withdrawal
@@ -1166,6 +1167,7 @@ export default function Page() {
                 onClick={() => {
                   setShowWithdrawModal(false)
                   setWithdrawAccountName('')
+                  setWithdrawAccountNumber('')
                   setWithdrawAmount('')
                 }}
                 className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors"
