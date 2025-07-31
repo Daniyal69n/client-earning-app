@@ -53,65 +53,80 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  investmentPlans: [{
-    planId: String,
-    planName: String,
-    amount: Number,
-    startDate: Date,
-    endDate: Date,
-    status: {
-      type: String,
-      enum: ['active', 'completed', 'cancelled'],
-      default: 'active'
-    }
-  }],
-  rechargeHistory: [{
-    amount: Number,
-    status: {
-      type: String,
-      enum: ['pending', 'approved', 'rejected'],
-      default: 'pending'
-    },
-    date: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  withdrawHistory: [{
-    amount: Number,
-    status: {
-      type: String,
-      enum: ['pending', 'approved', 'rejected'],
-      default: 'pending'
-    },
-    date: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  couponHistory: [{
-    couponCode: String,
-    bonusAmount: Number,
-    date: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  teamMembers: [{
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    level: {
-      type: String,
-      enum: ['A', 'B', 'C'],
-      default: 'A'
-    },
-    joinDate: {
-      type: Date,
-      default: Date.now
-    }
-  }],
+  investmentPlans: {
+    type: [{
+      planId: String,
+      planName: String,
+      amount: Number,
+      startDate: Date,
+      endDate: Date,
+      status: {
+        type: String,
+        enum: ['active', 'completed', 'cancelled'],
+        default: 'active'
+      }
+    }],
+    default: []
+  },
+  rechargeHistory: {
+    type: [{
+      amount: Number,
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      date: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    default: []
+  },
+  withdrawHistory: {
+    type: [{
+      amount: Number,
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      date: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    default: []
+  },
+  couponHistory: {
+    type: [{
+      couponCode: String,
+      bonusAmount: Number,
+      date: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    default: []
+  },
+  teamMembers: {
+    type: [{
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      level: {
+        type: String,
+        enum: ['A', 'B', 'C'],
+        default: 'A'
+      },
+      joinDate: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    default: []
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -146,6 +161,14 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 userSchema.methods.toPublicJSON = function() {
   const userObject = this.toObject();
   delete userObject.password;
+  
+  // Ensure arrays are properly initialized
+  if (!userObject.investmentPlans) userObject.investmentPlans = [];
+  if (!userObject.rechargeHistory) userObject.rechargeHistory = [];
+  if (!userObject.withdrawHistory) userObject.withdrawHistory = [];
+  if (!userObject.couponHistory) userObject.couponHistory = [];
+  if (!userObject.teamMembers) userObject.teamMembers = [];
+  
   return userObject;
 };
 
