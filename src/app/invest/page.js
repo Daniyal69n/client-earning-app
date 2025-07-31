@@ -171,7 +171,7 @@ export default function InvestPage() {
         const newBalance = userBalance - investAmount
         setUserBalance(newBalance)
         
-        showSuccess(`🎉 Investment successful! You have purchased ${selectedModel.name} for ${selectedModel.investAmount}. Daily income: ${selectedModel.dailyIncome}`)
+        showSuccess(`🎉 Investment successful! You have purchased ${selectedModel.name} for ${selectedModel.investAmount}. Daily income: ${selectedModel.dailyIncome}. You can purchase more plans to increase your earnings!`)
         
         // Redirect to home page to see the investment
         window.location.href = '/'
@@ -214,6 +214,9 @@ export default function InvestPage() {
               </h1>
               <p className="text-purple-100 text-lg mb-4">
                 Invest in premium Honda Civic models and earn daily returns
+              </p>
+              <p className="text-purple-200 text-sm mb-2">
+                💡 You can purchase multiple plans simultaneously to maximize your earnings!
               </p>
               <div className="overflow-hidden">
                 <div className="flex animate-scroll-ribbon">
