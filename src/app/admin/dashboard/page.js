@@ -1707,7 +1707,8 @@ export default function AdminDashboard() {
                           <p className="text-sm text-gray-600">Phone: {request.userId}</p>
                           <p className="text-sm text-gray-600">Amount: ${request.amount}</p>
                           <p className="text-sm text-gray-600">Method: {request.withdrawalMethod}</p>
-                          <p className="text-sm text-gray-600">Account: {request.withdrawalAccountName}</p>
+                          <p className="text-sm text-gray-600">Account Name: {request.withdrawalAccountName}</p>
+                          <p className="text-sm text-gray-600">Account Number: {request.withdrawalNumber || 'Not provided'}</p>
                           <p className="text-xs text-gray-500">Transaction ID: {request.transactionId}</p>
                           <p className="text-xs text-gray-500">Date: {new Date(request.date).toLocaleString()}</p>
                         </div>
