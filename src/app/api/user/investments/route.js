@@ -62,15 +62,7 @@ export async function POST(request) {
       return Response.json({ message: 'Insufficient balance' }, { status: 400 });
     }
     
-    // Check if user already has an active investment
-    const existingActiveInvestment = await UserInvestment.findOne({
-      userId: investmentData.userId,
-      isActive: true
-    });
-    
-    if (existingActiveInvestment) {
-      return Response.json({ message: 'You already have an active investment plan' }, { status: 400 });
-    }
+    // Allow multiple active investments - removed restriction
     
     // Deduct investment amount from user balance
     user.balance -= investAmount;
