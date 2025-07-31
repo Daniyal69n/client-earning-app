@@ -111,7 +111,7 @@ export default function Page() {
         });
         
         // Load current plan from database
-        const response = await fetch('/api/user/investments?active=true')
+        const response = await fetch(`/api/user/investments?active=true&userId=${user.phone}`)
         if (response.ok) {
           const investments = await response.json()
           if (investments.length > 0) {
