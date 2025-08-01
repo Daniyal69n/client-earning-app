@@ -57,7 +57,7 @@ export async function POST(request) {
     // Create transaction object
     const transactionObject = {
       userId: transactionData.userId,
-      userName: transactionData.userName,
+      userName: user.name || 'Unknown User', // Use actual user name from database
       type: transactionData.type,
       amount: transactionData.amount,
       status: transactionData.status || 'pending',
