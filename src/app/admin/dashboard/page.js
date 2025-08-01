@@ -588,6 +588,30 @@ export default function AdminDashboard() {
     }
   }
 
+  // Update transaction names with user names
+  const updateTransactionNames = async () => {
+    try {
+      setHistoryLoading(true)
+      const response = await fetch('/api/transactions/update-names', {
+        method: 'POST'
+      })
+      if (response.ok) {
+        const result = await response.json()
+        showSuccess(result.message)
+        // Refresh both histories after update
+        await refreshRechargeHistory()
+        await refreshWithdrawHistory()
+      } else {
+        showError('Failed to update transaction names')
+      }
+    } catch (error) {
+      console.error('Error updating transaction names:', error)
+      showError('Error updating transaction names')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
   // Filter functions
   const getFilteredRechargeHistory = () => {
     if (rechargeFilter === 'all') return rechargeHistory
@@ -597,6 +621,41 @@ export default function AdminDashboard() {
   const getFilteredWithdrawHistory = () => {
     if (withdrawFilter === 'all') return withdrawHistory
     return withdrawHistory.filter(transaction => transaction.status === withdrawFilter)
+  }
+
+  // Helper function to format date in Pakistan timezone
+  const formatPakistanDate = (dateString) => {
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'Invalid Date'
+      
+      return date.toLocaleDateString('en-PK', { 
+        timeZone: 'Asia/Karachi',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+    } catch (error) {
+      return 'Invalid Date'
+    }
+  }
+
+  // Helper function to format time in Pakistan timezone
+  const formatPakistanTime = (dateString) => {
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'Invalid Time'
+      
+      return date.toLocaleTimeString('en-PK', { 
+        timeZone: 'Asia/Karachi',
+        hour12: true,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    } catch (error) {
+      return 'Invalid Time'
+    }
   }
 
   // Handle recharge approval
@@ -1840,7 +1899,7 @@ export default function AdminDashboard() {
                           <p className="text-sm text-gray-600">Payment Method: {request.paymentMethod}</p>
                           <p className="text-sm text-blue-600">User Transaction ID: {request.userTransactionId || 'Not provided'}</p>
                           <p className="text-xs text-gray-500">System Transaction ID: {request.transactionId}</p>
-                          <p className="text-xs text-gray-500">Date: {new Date(request.date).toLocaleString()}</p>
+                          <p className="text-xs text-gray-500">Date: {formatPakistanDate(request.createdAt)} {formatPakistanTime(request.createdAt)}</p>
                         </div>
                         <div className="flex space-x-2">
                           <button
@@ -1881,7 +1940,7 @@ export default function AdminDashboard() {
                           <p className="text-sm text-gray-600">Account Name: {request.withdrawalAccountName}</p>
                           <p className="text-sm text-gray-600">Account Number: {request.withdrawalNumber || 'Not provided'}</p>
                           <p className="text-xs text-gray-500">Transaction ID: {request.transactionId}</p>
-                          <p className="text-xs text-gray-500">Date: {new Date(request.date).toLocaleString()}</p>
+                          <p className="text-xs text-gray-500">Date: {formatPakistanDate(request.createdAt)} {formatPakistanTime(request.createdAt)}</p>
                         </div>
                         <div className="flex space-x-2">
                           <button
@@ -2234,6 +2293,16 @@ export default function AdminDashboard() {
                   </svg>
                   <span>Refresh</span>
                 </button>
+                <button
+                  onClick={updateTransactionNames}
+                  disabled={historyLoading}
+                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>Update Names</span>
+                </button>
               </div>
             </div>
 
@@ -2361,10 +2430,10 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-3 px-4">
                           <span className="text-sm text-gray-600">
-                            {new Date(transaction.date).toLocaleDateString()}
+                            {formatPakistanDate(transaction.createdAt)}
                           </span>
                           <div className="text-xs text-gray-500">
-                            {new Date(transaction.date).toLocaleTimeString()}
+                            {formatPakistanTime(transaction.createdAt)}
                           </div>
                         </td>
                       </tr>
@@ -2533,10 +2602,10 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-3 px-4">
                           <span className="text-sm text-gray-600">
-                            {new Date(transaction.date).toLocaleDateString()}
+                            {formatPakistanDate(transaction.createdAt)}
                           </span>
                           <div className="text-xs text-gray-500">
-                            {new Date(transaction.date).toLocaleTimeString()}
+                            {formatPakistanTime(transaction.createdAt)}
                           </div>
                         </td>
                       </tr>
