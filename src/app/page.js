@@ -1139,25 +1139,25 @@ export default function Page() {
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <button
                   type="button"
-                  onClick={() => setRechargeAmount('1000')}
+                  onClick={() => setRechargeAmount('1200')}
                   className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
-                    rechargeAmount === '1000'
+                    rechargeAmount === '1200'
                       ? 'border-purple-500 bg-purple-50 text-purple-700'
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
-                  <div className="text-sm font-medium">Rs 1,000</div>
+                  <div className="text-sm font-medium">Rs 1200</div>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRechargeAmount('2000')}
+                  onClick={() => setRechargeAmount('2500')}
                   className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
-                    rechargeAmount === '2000'
+                    rechargeAmount === '2500'
                       ? 'border-purple-500 bg-purple-50 text-purple-700'
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
-                  <div className="text-sm font-medium">Rs 2,000</div>
+                  <div className="text-sm font-medium">Rs 2,500</div>
                 </button>
                 <button
                   type="button"
@@ -1183,25 +1183,25 @@ export default function Page() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRechargeAmount('20000')}
+                  onClick={() => setRechargeAmount('15000')}
                   className={`p-2 border rounded-lg text-black font-semibold  text-center transition-colors ${
+                    rechargeAmount === '15000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 15,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('20000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
                     rechargeAmount === '20000'
                       ? 'border-purple-500 bg-purple-50 text-purple-700'
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
                   <div className="text-sm font-medium">Rs 20,000</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRechargeAmount('50000')}
-                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
-                    rechargeAmount === '50000'
-                      ? 'border-purple-500 bg-purple-50 text-purple-700'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="text-sm font-medium">Rs 50,000</div>
                 </button>
               </div>
               
