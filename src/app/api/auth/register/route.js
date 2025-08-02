@@ -41,13 +41,17 @@ export async function POST(request) {
       }
     }
 
-    // Create new user
+    // Create new user with signup bonus
+    const signupBonusAmount = 100; // Rs 100 signup bonus
+    
     const user = new User({
       name,
       phone,
       password,
       email,
       referralCode: referralCode || null,
+      balance: signupBonusAmount, // Add signup bonus to account balance
+      signupBonus: signupBonusAmount, // Track signup bonus separately
       investmentPlans: [],
       rechargeHistory: [],
       withdrawHistory: [],
@@ -56,6 +60,19 @@ export async function POST(request) {
     });
 
     await user.save();
+
+    // Create transaction record for signup bonus
+    const signupTransaction = new Transaction({
+      userId: user.phone,
+      userName: user.name,
+      type: 'signup_bonus',
+      amount: signupBonusAmount,
+      status: 'completed',
+      description: 'Welcome bonus for new user registration',
+      transactionId: 'SIGNUP' + Date.now() + Math.random().toString(36).substr(2, 9).toUpperCase()
+    });
+
+    await signupTransaction.save();
 
     // Add user to referrer's team if referral code was used
     if (referrer) {
@@ -78,7 +95,7 @@ export async function POST(request) {
     const userData = user.toPublicJSON();
 
     return NextResponse.json({
-      message: 'Registration successful',
+      message: `Registration successful! Welcome bonus of Rs ${signupBonusAmount} has been added to your account.`,
       ...userData
     }, { status: 201 });
 
