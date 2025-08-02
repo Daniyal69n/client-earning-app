@@ -43,6 +43,10 @@ const userInvestmentSchema = new mongoose.Schema({
   lastIncomeDate: {
     type: Date,
     default: Date.now
+  },
+  firstIncomeDate: {
+    type: Date,
+    required: true
   }
 }, {
   timestamps: true

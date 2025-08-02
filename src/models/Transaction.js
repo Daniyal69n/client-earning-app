@@ -48,6 +48,14 @@ const transactionSchema = new mongoose.Schema({
   withdrawalNumber: {
     type: String
   },
+  withdrawalFee: {
+    type: Number,
+    default: 0
+  },
+  amountAfterFee: {
+    type: Number,
+    default: 0
+  },
   // For recharge transactions
   paymentMethod: {
     type: String,

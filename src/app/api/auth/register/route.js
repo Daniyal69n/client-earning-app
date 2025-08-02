@@ -57,37 +57,21 @@ export async function POST(request) {
 
     await user.save();
 
-    // Add user to referrer's team and give referral bonus if referral code was used
+    // Add user to referrer's team if referral code was used
     if (referrer) {
+      // Set referral relationship (commission will be given when user buys a plan)
+      user.referredBy = referrer.phone;
+      user.referralLevel = 'A';
+      await user.save();
+      
+      // Add to referrer's team members
       referrer.teamMembers.push({
         userId: user._id,
         level: 'A',
         joinDate: new Date()
       });
       
-      // Give referral bonus to referrer (add to both earn balance and account balance)
-      const currentBalance = typeof referrer.balance === 'number' ? referrer.balance : 0;
-      const currentEarnBalance = typeof referrer.earnBalance === 'number' ? referrer.earnBalance : 0;
-      
-      const referralBonus = 100; // $100 referral bonus
-      const newBalance = currentBalance + referralBonus;
-      const newEarnBalance = currentEarnBalance + referralBonus;
-      
-      referrer.balance = newBalance;
-      referrer.earnBalance = newEarnBalance;
-      
       await referrer.save();
-      
-      // Create transaction record for referral bonus
-      await Transaction.create({
-        userId: referrer.phone,
-        type: 'referral_income',
-        amount: referralBonus,
-        status: 'completed',
-        description: `Referral bonus for new user: ${user.name} (${user.phone})`,
-        referralLevel: 'A',
-        transactionId: 'TXN' + Date.now() + Math.random().toString(36).substr(2, 9).toUpperCase()
-      });
     }
 
     // Return user data without password

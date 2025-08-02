@@ -29,6 +29,15 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  referredBy: {
+    type: String,
+    default: null
+  },
+  referralLevel: {
+    type: String,
+    enum: ['A', 'B', 'C'],
+    default: null
+  },
   isBlocked: {
     type: Boolean,
     default: false
@@ -42,6 +51,14 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
   earnBalance: {
+    type: Number,
+    default: 0
+  },
+  referralCommission: {
+    type: Number,
+    default: 0
+  },
+  totalCommissionEarned: {
     type: Number,
     default: 0
   },

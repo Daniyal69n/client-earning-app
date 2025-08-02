@@ -72,15 +72,22 @@ export async function PUT(request) {
           );
         }
         
+        // Calculate withdrawal fee (25%)
+        const withdrawalFee = data.amount * 0.25;
+        const amountAfterFee = data.amount - withdrawalFee;
+        
         // Create withdrawal transaction (pending - requires admin approval)
         await Transaction.create({
           userId: userId,
           type: 'withdraw',
-          amount: data.amount,
+          amount: data.amount, // Original amount requested
+          withdrawalFee: withdrawalFee, // 25% fee
+          amountAfterFee: amountAfterFee, // Amount after fee deduction
           status: 'pending',
-          description: `Withdrawal request via ${data.withdrawalMethod}`,
+          description: `Withdrawal request via ${data.withdrawalMethod} (Fee: Rs${withdrawalFee.toFixed(2)})`,
           withdrawalMethod: data.withdrawalMethod,
           withdrawalAccountName: data.withdrawalAccountName,
+          withdrawalNumber: data.withdrawalNumber,
           transactionId: 'TXN' + Date.now() + Math.random().toString(36).substr(2, 9).toUpperCase()
         });
         
@@ -111,51 +118,68 @@ export async function PUT(request) {
           });
           
           if (activeInvestment) {
-            const dailyIncomeAmount = parseFloat(activeInvestment.dailyIncome.replace(/[$,₹Rs]/g, '').replace(/,/g, ''));
+            // Check if it's time for the first income (24 hours after investDate)
+            const now = new Date();
+            const firstIncomeDate = new Date(activeInvestment.firstIncomeDate);
             
-            // Ensure balance fields are numbers before arithmetic operations
-            const currentEarnBalance = typeof user.earnBalance === 'number' ? user.earnBalance : 0;
-            const currentBalance = typeof user.balance === 'number' ? user.balance : 0;
-            
-            // Update user balances - add to both earn balance and account balance
-            const newEarnBalance = currentEarnBalance + dailyIncomeAmount;
-            const newBalance = currentBalance + dailyIncomeAmount;
-            
-            await User.findOneAndUpdate(
-              { phone: userId },
-              { 
-                earnBalance: newEarnBalance,
-                balance: newBalance,
-                lastDailyIncomeDate: currentDate
-              }
-            );
-            
-            // Create transaction record
-            await Transaction.create({
-              userId: userId,
-              type: 'daily_income',
-              amount: dailyIncomeAmount,
-              status: 'completed',
-              description: `Daily income from ${activeInvestment.planName}`,
-              transactionId: 'TXN' + Date.now() + Math.random().toString(36).substr(2, 9).toUpperCase()
-            });
-            
-            // Update investment record
-            await UserInvestment.findOneAndUpdate(
-              { _id: activeInvestment._id },
-              { 
-                totalEarned: activeInvestment.totalEarned + dailyIncomeAmount,
-                lastIncomeDate: new Date()
-              }
-            );
-            
-            return NextResponse.json({
-              message: 'Daily income added successfully',
-              incomeAdded: true,
-              incomeAmount: dailyIncomeAmount,
-              newEarnBalance: newEarnBalance,
-              newBalance: newBalance
-            });
+            // Only add income if current time has passed the first income date
+            if (now >= firstIncomeDate) {
+              const dailyIncomeAmount = parseFloat(activeInvestment.dailyIncome.replace(/[$,₹Rs]/g, '').replace(/,/g, ''));
+              
+              // Ensure balance fields are numbers before arithmetic operations
+              const currentEarnBalance = typeof user.earnBalance === 'number' ? user.earnBalance : 0;
+              const currentBalance = typeof user.balance === 'number' ? user.balance : 0;
+              
+              // Update user balances - add to both earn balance and account balance
+              const newEarnBalance = currentEarnBalance + dailyIncomeAmount;
+              const newBalance = currentBalance + dailyIncomeAmount;
+              
+              await User.findOneAndUpdate(
+                { phone: userId },
+                { 
+                  earnBalance: newEarnBalance,
+                  balance: newBalance,
+                  lastDailyIncomeDate: currentDate
+                }
+              );
+              
+              // Create transaction record
+              await Transaction.create({
+                userId: userId,
+                type: 'daily_income',
+                amount: dailyIncomeAmount,
+                status: 'completed',
+                description: `Daily income from ${activeInvestment.planName}`,
+                transactionId: 'TXN' + Date.now() + Math.random().toString(36).substr(2, 9).toUpperCase()
+              });
+              
+              // Update investment record
+              await UserInvestment.findOneAndUpdate(
+                { _id: activeInvestment._id },
+                { 
+                  totalEarned: activeInvestment.totalEarned + dailyIncomeAmount,
+                  lastIncomeDate: new Date()
+                }
+              );
+              
+              return NextResponse.json({
+                message: 'Daily income added successfully',
+                incomeAdded: true,
+                incomeAmount: dailyIncomeAmount,
+                newEarnBalance: newEarnBalance,
+                newBalance: newBalance
+              });
+            } else {
+              // Calculate time remaining until first income
+              const timeRemaining = firstIncomeDate.getTime() - now.getTime();
+              const hoursRemaining = Math.ceil(timeRemaining / (1000 * 60 * 60));
+              
+              return NextResponse.json({
+                message: `First daily income will be added in ${hoursRemaining} hours`,
+                incomeAdded: false,
+                hoursRemaining: hoursRemaining
+              });
+            }
           }
         }
         
@@ -169,6 +193,9 @@ export async function PUT(request) {
         // Calculate team income (3-tier referral system)
         const teamMembers = await User.find({ referralCode: userId });
         let totalTeamIncome = 0;
+        let levelAIncome = 0;
+        let levelBIncome = 0;
+        let levelCIncome = 0;
         
         // Level A: Direct referrals (16% commission)
         for (const member of teamMembers) {
@@ -185,6 +212,7 @@ export async function PUT(request) {
           }, 0);
           
           const commission = memberTotalActivity * 0.16;
+          levelAIncome += commission;
           totalTeamIncome += commission;
         }
         
@@ -206,6 +234,7 @@ export async function PUT(request) {
             }, 0);
             
             const commission = memberTotalActivity * 0.02;
+            levelBIncome += commission;
             totalTeamIncome += commission;
           }
         }
@@ -231,42 +260,59 @@ export async function PUT(request) {
               }, 0);
               
               const commission = memberTotalActivity * 0.02;
+              levelCIncome += commission;
               totalTeamIncome += commission;
             }
           }
         }
         
-        // Add team income to both earn balance and account balance
+        // Update user's referral commission and total commission earned
+        const currentReferralCommission = typeof user.referralCommission === 'number' ? user.referralCommission : 0;
+        const currentTotalCommissionEarned = typeof user.totalCommissionEarned === 'number' ? user.totalCommissionEarned : 0;
+        
+        // Add new team income to referral commission
+        const newReferralCommission = currentReferralCommission + totalTeamIncome;
+        const newTotalCommissionEarned = currentTotalCommissionEarned + totalTeamIncome;
+        
+        // Also add to earn balance and account balance for immediate use
+        const currentEarnBalance = typeof user.earnBalance === 'number' ? user.earnBalance : 0;
+        const currentBalance = typeof user.balance === 'number' ? user.balance : 0;
+        
+        const newEarnBalance = currentEarnBalance + totalTeamIncome;
+        const newBalance = currentBalance + totalTeamIncome;
+        
+        await User.findOneAndUpdate(
+          { phone: userId },
+          { 
+            referralCommission: newReferralCommission,
+            totalCommissionEarned: newTotalCommissionEarned,
+            earnBalance: newEarnBalance,
+            balance: newBalance
+          }
+        );
+        
+        // Create transaction record for team income
         if (totalTeamIncome > 0) {
-          // Ensure balance fields are numbers before arithmetic operations
-          const currentEarnBalance = typeof user.earnBalance === 'number' ? user.earnBalance : 0;
-          const currentBalance = typeof user.balance === 'number' ? user.balance : 0;
-          
-          const newEarnBalance = currentEarnBalance + totalTeamIncome;
-          const newBalance = currentBalance + totalTeamIncome;
-          
-          await User.findOneAndUpdate(
-            { phone: userId },
-            { 
-              earnBalance: newEarnBalance,
-              balance: newBalance
-            }
-          );
-          
-          // Create transaction record
           await Transaction.create({
             userId: userId,
             type: 'referral_income',
             amount: totalTeamIncome,
             status: 'completed',
-            description: 'Team referral income (3-tier system)',
+            description: `Team referral income - Level A: Rs${levelAIncome.toFixed(2)}, Level B: Rs${levelBIncome.toFixed(2)}, Level C: Rs${levelCIncome.toFixed(2)}`,
             transactionId: 'TXN' + Date.now() + Math.random().toString(36).substr(2, 9).toUpperCase()
           });
         }
         
         return NextResponse.json({
           message: 'Team income calculated successfully',
-          totalTeamIncome: totalTeamIncome
+          totalTeamIncome: totalTeamIncome,
+          levelAIncome: levelAIncome,
+          levelBIncome: levelBIncome,
+          levelCIncome: levelCIncome,
+          newReferralCommission: newReferralCommission,
+          newTotalCommissionEarned: newTotalCommissionEarned,
+          newEarnBalance: newEarnBalance,
+          newBalance: newBalance
         });
       }
 

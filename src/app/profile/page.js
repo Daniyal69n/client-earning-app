@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const [transactionId, setTransactionId] = useState('')
   const [rechargeHistory, setRechargeHistory] = useState([])
   const [withdrawHistory, setWithdrawHistory] = useState([])
+  const [investmentHistory, setInvestmentHistory] = useState([])
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('easypaisa')
   const [selectedWithdrawMethod, setSelectedWithdrawMethod] = useState('easypaisa')
   const [paymentDetails, setPaymentDetails] = useState({
@@ -33,6 +34,8 @@ export default function ProfilePage() {
   const [todayIncome, setTodayIncome] = useState(0)
   const [earnBalance, setEarnBalance] = useState(0)
   const [totalRecharge, setTotalRecharge] = useState(0)
+  const [referralCommission, setReferralCommission] = useState(0)
+  const [totalCommissionEarned, setTotalCommissionEarned] = useState(0)
   const [teamSize, setTeamSize] = useState(0)
   const [investments, setInvestments] = useState([])
   const [currentPlan, setCurrentPlan] = useState(null)
@@ -53,10 +56,14 @@ export default function ProfilePage() {
         setBalance(user.balance || 0);
         setEarnBalance(user.earnBalance || 0);
         setTotalRecharge(user.totalRecharge || 0);
+        setReferralCommission(user.referralCommission || 0);
+        setTotalCommissionEarned(user.totalCommissionEarned || 0);
         console.log('User data set in profile state:', {
           balance: user.balance || 0,
           earnBalance: user.earnBalance || 0,
-          totalRecharge: user.totalRecharge || 0
+          totalRecharge: user.totalRecharge || 0,
+          referralCommission: user.referralCommission || 0,
+          totalCommissionEarned: user.totalCommissionEarned || 0
         });
         showSuccess('Data refreshed successfully!');
       }
@@ -78,6 +85,8 @@ export default function ProfilePage() {
           setBalance(user.balance || 0)
           setEarnBalance(user.earnBalance || 0)
           setTotalRecharge(user.totalRecharge || 0)
+          setReferralCommission(user.referralCommission || 0)
+          setTotalCommissionEarned(user.totalCommissionEarned || 0)
           
           // Load current plan
           const response = await fetch('/api/user/investments?active=true')
@@ -90,6 +99,9 @@ export default function ProfilePage() {
           
           // Load transaction history
           await loadTransactionHistory(user.phone)
+          
+          // Load investment history
+          await loadInvestmentHistory(user.phone)
           
           // Load team data
           await loadTeamData(user.phone)
@@ -155,13 +167,27 @@ export default function ProfilePage() {
       const response = await fetch(`/api/transactions?userId=${userId}`)
       if (response.ok) {
         const transactions = await response.json()
-        const rechargeTxs = transactions.filter(tx => tx.type === 'recharge')
-        const withdrawTxs = transactions.filter(tx => tx.type === 'withdraw')
-        setRechargeHistory(rechargeTxs)
-        setWithdrawHistory(withdrawTxs)
+        setRechargeHistory(transactions.filter(tx => tx.type === 'recharge'))
+        setWithdrawHistory(transactions.filter(tx => tx.type === 'withdraw'))
+        showSuccess('Transaction history refreshed!')
       }
     } catch (error) {
       console.error('Error loading transaction history:', error)
+      showError('Failed to load transaction history')
+    }
+  }
+
+  const loadInvestmentHistory = async (userId) => {
+    try {
+      const response = await fetch(`/api/user/investments?userId=${userId}`)
+      if (response.ok) {
+        const investments = await response.json()
+        setInvestmentHistory(investments)
+        showSuccess('Investment history refreshed!')
+      }
+    } catch (error) {
+      console.error('Error loading investment history:', error)
+      showError('Failed to load investment history')
     }
   }
 
@@ -210,6 +236,9 @@ export default function ProfilePage() {
             setEarnBalance(result.newEarnBalance)
             setBalance(result.newBalance)
             showSuccess(`Daily income of ${result.incomeAmount} Rs added from ${currentPlan.planName}`)
+          } else if (result.hoursRemaining) {
+            // Show info about time remaining until first income
+            showInfo(`First daily income will be added in ${result.hoursRemaining} hours`)
           }
         }
       } catch (error) {
@@ -312,12 +341,19 @@ export default function ProfilePage() {
       return
     }
 
+    const amount = parseFloat(rechargeAmount)
+    
+    // Check minimum recharge limit
+    if (amount < 1000) {
+      showError('Minimum recharge amount is Rs 1000')
+      return
+    }
+
     if (!userData) {
       showError('Please log in to recharge')
       return
     }
 
-    const amount = parseFloat(rechargeAmount)
     try {
       await updateUserBalance(userData.phone, 'recharge', {
         amount: amount,
@@ -331,8 +367,7 @@ export default function ProfilePage() {
       setRechargeAmount('')
       setTransactionId('')
       setShowRechargeModal(false)
-      // Refresh user data to show updated balance immediately
-      await refreshUserData()
+      refreshUserData()
     } catch (error) {
       showError(error.message || 'Recharge request failed')
     }
@@ -351,12 +386,18 @@ export default function ProfilePage() {
       return
     }
 
+    const amount = parseFloat(withdrawAmount)
+    
+    // Check minimum withdrawal limit
+    if (amount < 300) {
+      showError('Minimum withdrawal amount is Rs 300')
+      return
+    }
+
     if (!userData) {
       showError('Please log in to withdraw')
       return
     }
-
-    const amount = parseFloat(withdrawAmount)
 
     try {
       await updateUserBalance(userData.phone, 'withdraw', {
@@ -370,8 +411,7 @@ export default function ProfilePage() {
       setWithdrawAmount('')
       setWithdrawAccountName('')
       setShowWithdrawModal(false)
-      // Refresh user data to show updated balance immediately
-      await refreshUserData()
+      refreshUserData()
     } catch (error) {
       showError(error.message || 'Withdrawal request failed')
     }
@@ -508,6 +548,7 @@ export default function ProfilePage() {
                 <div className="relative z-10">
                   <p className="text-xs font-medium opacity-90">Earn Balance</p>
                   <p className="text-lg font-bold mt-1">Rs{earnBalance.toFixed(2)}</p>
+                  <p className="text-xs text-green-600 mt-1">Team Commission: Rs{referralCommission.toFixed(2)}</p>
                 </div>
               </div>
               
@@ -519,6 +560,8 @@ export default function ProfilePage() {
                   <p className="text-lg font-bold mt-1">Rs{totalRecharge.toFixed(2)}</p>
                 </div>
               </div>
+              
+
             </div>
           </div>
           
@@ -576,6 +619,331 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Transaction History Section */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-white flex items-center">
+              <svg className="w-5 h-5 text-white mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Transaction History
+            </h3>
+            <button
+              onClick={() => userData && loadTransactionHistory(userData.phone)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
+
+          {/* Recharge History */}
+          <div className="bg-white rounded-lg p-6 shadow-lg mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-bold text-purple-900 flex items-center">
+                <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                Recharge History
+              </h4>
+              <span className="text-sm text-gray-500">
+                {rechargeHistory.length} transaction{rechargeHistory.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            
+            {rechargeHistory.length > 0 ? (
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {rechargeHistory.map((transaction, index) => (
+                  <div key={transaction.transactionId || index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div className={`w-3 h-3 rounded-full mr-3 ${
+                          transaction.status === 'approved' ? 'bg-green-500' :
+                          transaction.status === 'pending' ? 'bg-yellow-500' :
+                          transaction.status === 'rejected' ? 'bg-red-500' : 'bg-gray-500'
+                        }`}></div>
+                        <span className="font-semibold text-gray-900">
+                          Rs{transaction.amount.toFixed(2)}
+                        </span>
+                      </div>
+                      <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                        transaction.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        transaction.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                      </span>
+                    </div>
+                    
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Method:</span>
+                        <span className="font-medium">{transaction.paymentMethod || 'N/A'}</span>
+                      </div>
+                      {transaction.userTransactionId && (
+                        <div className="flex justify-between">
+                          <span>Transaction ID:</span>
+                          <span className="font-mono text-xs">{transaction.userTransactionId}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span>Date:</span>
+                        <span>{new Date(transaction.createdAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</span>
+                      </div>
+                      {transaction.description && (
+                        <div className="text-gray-500 text-xs mt-2">
+                          {transaction.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <p>No recharge transactions found</p>
+                <p className="text-sm">Your recharge history will appear here</p>
+              </div>
+            )}
+          </div>
+
+          {/* Withdraw History */}
+          <div className="bg-white rounded-lg p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-bold text-purple-900 flex items-center">
+                <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+                Withdraw History
+              </h4>
+              <span className="text-sm text-gray-500">
+                {withdrawHistory.length} transaction{withdrawHistory.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            
+            {withdrawHistory.length > 0 ? (
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {withdrawHistory.map((transaction, index) => (
+                  <div key={transaction.transactionId || index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div className={`w-3 h-3 rounded-full mr-3 ${
+                          transaction.status === 'approved' ? 'bg-green-500' :
+                          transaction.status === 'pending' ? 'bg-yellow-500' :
+                          transaction.status === 'rejected' ? 'bg-red-500' : 'bg-gray-500'
+                        }`}></div>
+                        <span className="font-semibold text-gray-900">
+                          Rs{transaction.amount.toFixed(2)}
+                        </span>
+                      </div>
+                      <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                        transaction.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        transaction.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                      </span>
+                    </div>
+                    
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Amount:</span>
+                        <span className="font-medium">Rs{transaction.amount.toFixed(2)}</span>
+                      </div>
+                      {transaction.withdrawalFee > 0 && (
+                        <div className="flex justify-between">
+                          <span>Fee (25%):</span>
+                          <span className="font-medium text-red-600">-Rs{transaction.withdrawalFee.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {transaction.amountAfterFee > 0 && (
+                        <div className="flex justify-between">
+                          <span>You'll Receive:</span>
+                          <span className="font-medium text-green-600">Rs{transaction.amountAfterFee.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span>Method:</span>
+                        <span className="font-medium">{transaction.withdrawalMethod || 'N/A'}</span>
+                      </div>
+                      {transaction.withdrawalAccountName && (
+                        <div className="flex justify-between">
+                          <span>Account Name:</span>
+                          <span className="font-medium">{transaction.withdrawalAccountName}</span>
+                        </div>
+                      )}
+                      {transaction.withdrawalNumber && (
+                        <div className="flex justify-between">
+                          <span>Account Number:</span>
+                          <span className="font-mono text-xs">{transaction.withdrawalNumber}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span>Date:</span>
+                        <span>{new Date(transaction.createdAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</span>
+                      </div>
+                      {transaction.description && (
+                        <div className="text-gray-500 text-xs mt-2">
+                          {transaction.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+                <p>No withdraw transactions found</p>
+                <p className="text-sm">Your withdrawal history will appear here</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Investment History Section */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-white flex items-center">
+              <svg className="w-5 h-5 text-white mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Investment History
+            </h3>
+            <button
+              onClick={() => userData && loadInvestmentHistory(userData.phone)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
+
+          <div className="bg-white rounded-lg p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-bold text-purple-900 flex items-center">
+                <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                Plan Purchase History
+              </h4>
+              <span className="text-sm text-gray-500">
+                {investmentHistory.length} investment{investmentHistory.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            
+            {investmentHistory.length > 0 ? (
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {investmentHistory.map((investment, index) => {
+                  const investDate = new Date(investment.investDate)
+                  const firstIncomeDate = new Date(investment.firstIncomeDate)
+                  const now = new Date()
+                  const isActive = investment.isActive
+                  const isFirstIncomeTime = now >= firstIncomeDate
+                  
+                  return (
+                    <div key={investment._id || index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <div className={`w-3 h-3 rounded-full mr-3 ${
+                            isActive ? 'bg-green-500' : 'bg-gray-500'
+                          }`}></div>
+                          <span className="font-semibold text-gray-900">
+                            {investment.planName}
+                          </span>
+                        </div>
+                        <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                          isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <div className="flex justify-between">
+                          <span>Investment Amount:</span>
+                          <span className="font-medium">{investment.investAmount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Daily Income:</span>
+                          <span className="font-medium">{investment.dailyIncome}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Validity:</span>
+                          <span className="font-medium">{investment.validity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total Earned:</span>
+                          <span className="font-medium">Rs{investment.totalEarned.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Purchase Date:</span>
+                          <span>{investDate.toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</span>
+                        </div>
+                        {isActive && (
+                          <div className="flex justify-between">
+                            <span>First Income:</span>
+                            <span className={`font-medium ${isFirstIncomeTime ? 'text-green-600' : 'text-orange-600'}`}>
+                              {isFirstIncomeTime ? 'Started' : `${Math.ceil((firstIncomeDate.getTime() - now.getTime()) / (1000 * 60 * 60))}h remaining`}
+                            </span>
+                          </div>
+                        )}
+                        {investment.lastIncomeDate && (
+                          <div className="flex justify-between">
+                            <span>Last Income:</span>
+                            <span>{new Date(investment.lastIncomeDate).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                <p>No investment history found</p>
+                <p className="text-sm">Your plan purchase history will appear here</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -655,21 +1023,93 @@ export default function ProfilePage() {
             
             {/* Amount Input */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Amount ($)</label>
+              <label className="block text-sm font-medium text-black mb-2">Amount (Rs)</label>
+              
+              {/* Predefined Amount Options */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('1000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '1000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 1,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('2000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '2000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 2,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('5000')}
+                  className={`p-2 border rounded-lg text-black font-semibold  text-center transition-colors ${
+                    rechargeAmount === '5000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 5,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('10000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '10000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 10,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('20000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '20000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 20,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('50000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '50000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 50,000</div>
+                </button>
+              </div>
+              
               <input
                 type="number"
                 value={rechargeAmount}
                 onChange={(e) => setRechargeAmount(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                placeholder="Enter amount"
-                min="1"
+                placeholder="Enter custom amount (min: Rs 1,000)"
+                min="1000"
                 step="0.01"
               />
+              <p className="text-xs text-gray-500 mt-1">Minimum recharge amount: Rs 1,000</p>
             </div>
 
             {/* Transaction ID Input */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction ID (Optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction ID </label>
               <input
                 type="text"
                 value={transactionId}
@@ -692,7 +1132,7 @@ export default function ProfilePage() {
                        : 'border-gray-300 hover:border-gray-400'
                    }`}
                  >
-                   <div className="text-lg font-semibold">EasyPaisa</div>
+                   <div className="text-lg text-black font-semibold">EasyPaisa</div>
                  </button>
                  <button
                    type="button"
@@ -703,7 +1143,7 @@ export default function ProfilePage() {
                        : 'border-gray-300 hover:border-gray-400'
                    }`}
                  >
-                   <div className="text-lg font-semibold">JazzCash</div>
+                   <div className="text-lg text-black font-semibold">JazzCash</div>
                  </button>
               </div>
             </div>
@@ -751,24 +1191,51 @@ export default function ProfilePage() {
             {/* Available Balance */}
             <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm text-green-800">
-                <span className="font-semibold">Available Balance:</span> ${balance.toFixed(2)}
+                <span className="font-semibold">Available Balance:</span> Rs{balance.toFixed(2)}
               </p>
             </div>
 
             {/* Amount Input */}
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Withdrawal Amount ($)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Withdrawal Amount (Rs)</label>
               <input
                 type="number"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                placeholder="Enter amount"
-                min="1"
+                placeholder="Enter amount (min: Rs 300)"
+                min="300"
                 max={balance}
                 step="0.01"
               />
+              <p className="text-xs text-gray-500 mt-1">Minimum withdrawal amount: Rs 300</p>
             </div>
+
+            {/* Withdrawal Fee Warning */}
+            {withdrawAmount > 0 && (
+              <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <svg className="w-4 h-4 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-sm font-medium text-orange-800">Withdrawal Fee: 25%</span>
+                </div>
+                <div className="text-xs text-orange-700 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Requested Amount:</span>
+                    <span>Rs{parseFloat(withdrawAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Fee (25%):</span>
+                    <span className="text-red-600">-Rs{(parseFloat(withdrawAmount || 0) * 0.25).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>You'll Receive:</span>
+                    <span className="text-green-600">Rs{(parseFloat(withdrawAmount || 0) * 0.75).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Withdrawal Method Selection */}
             <div className="mb-3">
@@ -831,7 +1298,7 @@ export default function ProfilePage() {
               <h4 className="text-sm font-medium text-blue-800 mb-1">Withdrawal Information:</h4>
               <ul className="text-xs text-blue-700 space-y-0.5">
                 <li>• Amount will be sent to your {selectedWithdrawMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash'} account</li>
-                <li>• Processing time: 24-48 hours</li>
+                <li>• Processing time: 5-30 minutes</li>
                 <li>• Make sure account details are correct</li>
                 <li>• Admin will verify and process your withdrawal</li>
               </ul>

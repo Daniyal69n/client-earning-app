@@ -38,6 +38,8 @@ export default function Page() {
   const [todayIncome, setTodayIncome] = useState(0)
   const [earnBalance, setEarnBalance] = useState(0)
   const [totalRecharge, setTotalRecharge] = useState(0)
+  const [referralCommission, setReferralCommission] = useState(0)
+  const [totalCommissionEarned, setTotalCommissionEarned] = useState(0)
   
 
   
@@ -105,10 +107,14 @@ export default function Page() {
         setUserBalance(user.balance || 0);
         setEarnBalance(user.earnBalance || 0);
         setTotalRecharge(user.totalRecharge || 0);
+        setReferralCommission(user.referralCommission || 0);
+        setTotalCommissionEarned(user.totalCommissionEarned || 0);
         console.log('User data set in state:', {
           balance: user.balance || 0,
           earnBalance: user.earnBalance || 0,
-          totalRecharge: user.totalRecharge || 0
+          totalRecharge: user.totalRecharge || 0,
+          referralCommission: user.referralCommission || 0,
+          totalCommissionEarned: user.totalCommissionEarned || 0
         });
         
         // Load current plans from database
@@ -217,6 +223,9 @@ export default function Page() {
               setEarnBalance(result.newEarnBalance)
               setUserBalance(result.newBalance)
               showSuccess(`Daily income of ${result.incomeAmount} Rs added from ${plan.planName}`)
+            } else if (result.hoursRemaining) {
+              // Show info about time remaining until first income
+              showInfo(`First daily income will be added in ${result.hoursRemaining} hours`)
             }
           }
         }
@@ -358,7 +367,19 @@ export default function Page() {
 
       if (response.ok) {
         const result = await response.json()
-        // Team income is already added to earn balance in the backend
+        // Update state with new team income data
+        if (result.newReferralCommission !== undefined) {
+          setReferralCommission(result.newReferralCommission)
+        }
+        if (result.newTotalCommissionEarned !== undefined) {
+          setTotalCommissionEarned(result.newTotalCommissionEarned)
+        }
+        if (result.newEarnBalance !== undefined) {
+          setEarnBalance(result.newEarnBalance)
+        }
+        if (result.newBalance !== undefined) {
+          setUserBalance(result.newBalance)
+        }
         console.log('Team income calculated:', result)
       }
     } catch (error) {
@@ -433,12 +454,18 @@ export default function Page() {
       return
     }
 
+    const amount = parseFloat(rechargeAmount)
+    
+    // Check minimum recharge limit
+    if (amount < 1000) {
+      showError('Minimum recharge amount is Rs 1000')
+      return
+    }
+
     if (!userData) {
       showError('Please log in to recharge')
       return
     }
-
-    const amount = parseFloat(rechargeAmount)
 
     try {
       await updateUserBalance(userData.phone, 'recharge', {
@@ -449,7 +476,7 @@ export default function Page() {
         transactionId: transactionId.trim()
       })
 
-      showSuccess(`Recharge request submitted for $${amount}. Admin will approve your payment.`)
+      showSuccess(`Recharge request submitted for {amount}. Admin will approve your payment.`)
       setRechargeAmount('')
       setTransactionId('')
       setShowRechargeModal(false)
@@ -471,12 +498,18 @@ export default function Page() {
       return
     }
 
+    const amount = parseFloat(withdrawAmount)
+    
+    // Check minimum withdrawal limit
+    if (amount < 300) {
+      showError('Minimum withdrawal amount is Rs 300')
+      return
+    }
+
     if (!userData) {
       showError('Please log in to withdraw')
       return
     }
-
-    const amount = parseFloat(withdrawAmount)
 
     try {
       await updateUserBalance(userData.phone, 'withdraw', {
@@ -486,7 +519,7 @@ export default function Page() {
         withdrawalAccountName: withdrawAccountName
       })
 
-      showSuccess(`Withdrawal request submitted for $${amount}. Admin will process your withdrawal.`)
+      showSuccess(`Withdrawal request submitted for {amount}. Admin will process your withdrawal.`)
       setWithdrawAmount('')
       setWithdrawAccountName('')
       setShowWithdrawModal(false)
@@ -556,6 +589,87 @@ export default function Page() {
       }
     } catch (error) {
       showError(error.message || 'Coupon redemption failed')
+    }
+  }
+
+  const handleRefreshTeamCommission = async () => {
+    if (!userData) {
+      showError('Please log in to refresh team commission')
+      return
+    }
+
+    try {
+      showInfo('Calculating team commission...')
+      
+      const response = await fetch(`/api/user/balance`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'calculate_team_income',
+          userId: userData.phone
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        
+        // Update state with new team income data
+        if (result.newReferralCommission !== undefined) {
+          setReferralCommission(result.newReferralCommission)
+        }
+        if (result.newTotalCommissionEarned !== undefined) {
+          setTotalCommissionEarned(result.newTotalCommissionEarned)
+        }
+        if (result.newEarnBalance !== undefined) {
+          setEarnBalance(result.newEarnBalance)
+        }
+        if (result.newBalance !== undefined) {
+          setUserBalance(result.newBalance)
+        }
+        
+        if (result.totalTeamIncome > 0) {
+          showSuccess(`Team commission updated! Earned Rs${result.totalTeamIncome.toFixed(2)} from your team.`)
+        } else {
+          showInfo('No new team commission to add at this time.')
+        }
+        
+        console.log('Team commission refreshed:', result)
+      } else {
+        showError('Failed to refresh team commission')
+      }
+    } catch (error) {
+      console.error('Error refreshing team commission:', error)
+      showError('Failed to refresh team commission')
+    }
+  }
+
+  const handleTestTeamCommission = async () => {
+    if (!userData) {
+      showError('Please log in to test team commission')
+      return
+    }
+
+    try {
+      showInfo('Testing team commission calculation...')
+      
+      const response = await fetch('/api/test-team-commission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userData.phone
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Team commission test result:', result)
+        showSuccess(`Test completed! Check console for details. Total potential commission: Rs${result.commissionCalculation.totalTeamIncome.toFixed(2)}`)
+      } else {
+        showError('Failed to test team commission')
+      }
+    } catch (error) {
+      console.error('Error testing team commission:', error)
+      showError('Failed to test team commission')
     }
   }
 
@@ -754,8 +868,15 @@ export default function Page() {
                 <div className="relative z-10">
                   <p className="text-xs font-medium opacity-90">Earn Balance</p>
                   <p className="text-lg font-bold mt-1">Rs{earnBalance.toFixed(2)}</p>
+                  <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
+                    <p className="text-xs text-green-700 font-medium">Team Commission</p>
+                    <p className="text-sm font-bold text-green-600">Rs{referralCommission.toFixed(2)}</p>
+                    <p className="text-xs text-green-600 mt-1">Available for withdrawal</p>
+                  </div>
                 </div>
               </div>
+              
+
               
               {/* Total Recharge */}
               <div className="bg-white rounded-lg p-3 text-purple-900 relative overflow-hidden" style={{ boxShadow: 'rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px' }}>
@@ -768,6 +889,119 @@ export default function Page() {
             </div>
           </div>
           
+          {/* Team Commission Section */}
+          <div className="bg-white rounded-lg p-6 mb-6" style={{ boxShadow: 'rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-purple-900 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Team Commission
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRefreshTeamCommission}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
+                <button
+                  onClick={() => handleNavigation('team')}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  View Team
+                </button>
+                <button
+                  onClick={handleTestTeamCommission}
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                  title="Test team commission calculation"
+                >
+                  Test
+                </button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {/* Total Commission Earned */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-green-700 font-medium">Total Commission</p>
+                    <p className="text-xl font-bold text-green-600">Rs{totalCommissionEarned.toFixed(2)}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Available Commission */}
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-700 font-medium">Available Commission</p>
+                    <p className="text-xl font-bold text-blue-600">Rs{referralCommission.toFixed(2)}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Commission Rate */}
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-700 font-medium">Commission Rate</p>
+                    <p className="text-xl font-bold text-purple-600">16% / 2% / 2%</p>
+                    <p className="text-xs text-purple-600">Level A / B / C</p>
+                  </div>
+                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Commission Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-blue-800 mb-2">💡 How Team Commission Works:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-blue-700">
+                <div>
+                  <p className="font-medium">Level A (Direct Referrals)</p>
+                  <p>• 16% commission on their activity</p>
+                  <p>• Direct team members</p>
+                </div>
+                <div>
+                  <p className="font-medium">Level B (Indirect Referrals)</p>
+                  <p>• 2% commission on their activity</p>
+                  <p>• Your team's referrals</p>
+                </div>
+                <div>
+                  <p className="font-medium">Level C (Third Level)</p>
+                  <p>• 2% commission on their activity</p>
+                  <p>• Extended network</p>
+                </div>
+              </div>
+              <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                <strong>✅ Available for Withdrawal:</strong> Your team commission is automatically added to your account balance and can be withdrawn anytime!
+              </div>
+            </div>
+          </div>
+
           {/* Refresh Data Button */}
           <div className="flex justify-end mb-4 gap-2">
             <button
@@ -899,21 +1133,93 @@ export default function Page() {
 
             {/* Amount Input */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Amount ($)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Amount (Rs)</label>
+              
+              {/* Predefined Amount Options */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('1000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '1000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 1,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('2000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '2000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 2,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('5000')}
+                  className={`p-2 border rounded-lg text-black font-semibold  text-center transition-colors ${
+                    rechargeAmount === '5000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 5,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('10000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '10000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 10,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('20000')}
+                  className={`p-2 border rounded-lg text-black font-semibold  text-center transition-colors ${
+                    rechargeAmount === '20000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 20,000</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRechargeAmount('50000')}
+                  className={`p-2 border rounded-lg text-black font-semibold text-center transition-colors ${
+                    rechargeAmount === '50000'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="text-sm font-medium">Rs 50,000</div>
+                </button>
+              </div>
+              
               <input
                 type="number"
                 value={rechargeAmount}
                 onChange={(e) => setRechargeAmount(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                placeholder="Enter amount"
-                min="1"
+                placeholder="Enter custom amount (min: Rs 1,000)"
+                min="1000"
                 step="0.01"
               />
+              <p className="text-xs text-gray-500 mt-1">Minimum recharge amount: Rs 1,000</p>
             </div>
 
             {/* Transaction ID Input */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction ID (Optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Transaction ID </label>
               <input
                 type="text"
                 value={transactionId}
@@ -930,13 +1236,13 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => setSelectedPaymentMethod('easypaisa')}
-                  className={`p-3 border rounded-lg text-center transition-colors ${
+                  className={`p-3 border rounded-lg text-black font-semibold text-center transition-colors ${
                     selectedPaymentMethod === 'easypaisa'
                       ? 'border-purple-500 bg-purple-50 text-purple-700'
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
-                  <div className="text-lg font-semibold">EasyPaisa</div>
+                  <div className="text-lg text-black font-semibold">EasyPaisa</div>
                 </button>
                 <button
                   type="button"
@@ -947,7 +1253,7 @@ export default function Page() {
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
-                  <div className="text-lg font-semibold">JazzCash</div>
+                  <div className="text-lg text-black font-semibold">JazzCash</div>
                 </button>
               </div>
             </div>
@@ -995,23 +1301,54 @@ export default function Page() {
             {/* Available Balance */}
             <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm text-green-800">
-                <span className="font-semibold">Available Balance:</span> $100.00
+                <span className="font-semibold">Available Balance:</span> Rs{userBalance.toFixed(2)}
+              </p>
+              <p className="text-xs text-green-700 mt-1">
+                <span className="font-medium">Includes:</span> Daily income + Team commission + Recharge amount
               </p>
             </div>
 
             {/* Amount Input */}
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Withdrawal Amount ($)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Withdrawal Amount (Rs)</label>
               <input
                 type="number"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                placeholder="Enter amount"
-                min="1"
+                placeholder="Enter amount (min: Rs 300)"
+                min="300"
+                max={userBalance}
                 step="0.01"
               />
+              <p className="text-xs text-gray-500 mt-1">Minimum withdrawal amount: Rs 300</p>
             </div>
+
+            {/* Withdrawal Fee Warning */}
+            {withdrawAmount > 0 && (
+              <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <svg className="w-4 h-4 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-sm font-medium text-orange-800">Withdrawal Fee: 25%</span>
+                </div>
+                <div className="text-xs text-orange-700 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Requested Amount:</span>
+                    <span>Rs{parseFloat(withdrawAmount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Fee (25%):</span>
+                    <span className="text-red-600">-Rs{(parseFloat(withdrawAmount || 0) * 0.25).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>You'll Receive:</span>
+                    <span className="text-green-600">Rs{(parseFloat(withdrawAmount || 0) * 0.75).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Withdrawal Method Selection */}
             <div className="mb-3">
@@ -1026,7 +1363,7 @@ export default function Page() {
                       : 'border-gray-300 hover:border-gray-400'
                 }`}
                 >
-                  <div className="text-base font-semibold">EasyPaisa</div>
+                  <div className="text-base text-black font-semibold">EasyPaisa</div>
                 </button>
                 <button
                   type="button"
@@ -1037,7 +1374,7 @@ export default function Page() {
                       : 'border-gray-300 hover:border-gray-400'
                 }`}
                 >
-                  <div className="text-base font-semibold">JazzCash</div>
+                  <div className="text-base text-black font-semibold">JazzCash</div>
                 </button>
               </div>
             </div>
@@ -1074,7 +1411,7 @@ export default function Page() {
               <h4 className="text-sm font-medium text-blue-800 mb-1">Withdrawal Information:</h4>
               <ul className="text-xs text-blue-700 space-y-0.5">
                 <li>• Amount will be sent to your {selectedWithdrawMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash'} account</li>
-                <li>• Processing time: 24-48 hours</li>
+                <li>• Processing time: 5-30 minutes</li>
                 <li>• Make sure account details are correct</li>
                 <li>• Admin will verify and process your withdrawal</li>
               </ul>

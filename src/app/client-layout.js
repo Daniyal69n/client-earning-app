@@ -15,63 +15,63 @@ function ClientLayoutContent({ children }) {
   const [isLoading, setIsLoading] = useState(true)
   const userInitial = userName.charAt(0).toUpperCase()
 
-  // Check authentication on component mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      const loginStatus = sessionStorage.getItem('isLoggedIn')
-      const userData = sessionStorage.getItem('userData')
+            // Check authentication on component mount
+          useEffect(() => {
+            const checkAuth = async () => {
+              const loginStatus = sessionStorage.getItem('isLoggedIn')
+              const userData = sessionStorage.getItem('userData')
 
-      if (loginStatus === 'true' && userData) {
-        const user = JSON.parse(userData)
-        
-        // Check if user is blocked from database
-        try {
-          const response = await fetch(`/api/user/profile?phone=${user.phone}`)
-          if (response.ok) {
-            const currentUser = await response.json()
-            
-            if (currentUser.isBlocked) {
-              // User is blocked, log them out immediately
-              sessionStorage.removeItem('isLoggedIn')
-              sessionStorage.removeItem('userData')
-              sessionStorage.removeItem('userPhone')
-              showError('Your account has been blocked. Please contact admin for support.')
-              router.push('/login')
+              if (loginStatus === 'true' && userData) {
+                const user = JSON.parse(userData)
+                
+                // Check if user is blocked from database
+                try {
+                  const response = await fetch(`/api/user/profile?phone=${user.phone}`)
+                  if (response.ok) {
+                    const currentUser = await response.json()
+                    
+                    if (currentUser.isBlocked) {
+                      // User is blocked, log them out immediately
+                      sessionStorage.removeItem('isLoggedIn')
+                      sessionStorage.removeItem('userData')
+                      sessionStorage.removeItem('userPhone')
+                      showError('Your account has been blocked. Please contact admin for support.')
+                      router.push('/login')
+                      setIsLoading(false)
+                      return
+                    }
+                    
+                    setUserName(currentUser.name || 'John Doe')
+                    setUserPhone(currentUser.phone || '+92 300 1234567')
+                    setIsLoggedIn(true)
+                  } else {
+                    // User not found in database, log them out
+                    sessionStorage.removeItem('isLoggedIn')
+                    sessionStorage.removeItem('userData')
+                    sessionStorage.removeItem('userPhone')
+                    router.push('/login')
+                  }
+                } catch (error) {
+                  console.error('Error checking user status:', error)
+                  // On error, still allow access but log the error
+                  setUserName(user.name || 'John Doe')
+                  setUserPhone(user.phone || '+92 300 1234567')
+                  setIsLoggedIn(true)
+                }
+              } else {
+                // Redirect to login if not authenticated and not already on login/register pages or admin pages
+                if (!pathname.includes('/login') && !pathname.includes('/register') && !pathname.includes('/admin')) {
+                  router.push('/login')
+                }
+              }
               setIsLoading(false)
-              return
             }
-            
-            setUserName(currentUser.name || 'John Doe')
-            setUserPhone(currentUser.phone || '+92 300 1234567')
-            setIsLoggedIn(true)
-          } else {
-            // User not found in database, log them out
-            sessionStorage.removeItem('isLoggedIn')
-            sessionStorage.removeItem('userData')
-            sessionStorage.removeItem('userPhone')
-            router.push('/login')
-          }
-        } catch (error) {
-          console.error('Error checking user status:', error)
-          // On error, still allow access but log the error
-          setUserName(user.name || 'John Doe')
-          setUserPhone(user.phone || '+92 300 1234567')
-          setIsLoggedIn(true)
-        }
-      } else {
-        // Redirect to login if not authenticated and not already on login/register pages or admin pages
-        if (!pathname.includes('/login') && !pathname.includes('/register') && !pathname.includes('/admin')) {
-          router.push('/login')
-        }
-      }
-      setIsLoading(false)
-    }
 
-    // Only run auth check on client side
-    if (typeof window !== 'undefined') {
-      checkAuth()
-    }
-  }, [pathname, router, showError])
+            // Only run auth check on client side
+            if (typeof window !== 'undefined') {
+              checkAuth()
+            }
+          }, [pathname, router, showError])
 
   // Update active navigation based on current pathname
   useEffect(() => {

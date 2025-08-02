@@ -79,8 +79,47 @@ export async function POST(request) {
       investDate: investmentData.investDate || new Date(),
       isActive: true,
       totalEarned: 0,
-      lastIncomeDate: new Date()
+      lastIncomeDate: null,
+      firstIncomeDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
     });
+
+    // Handle referral commission when someone buys a plan
+    if (user.referredBy) {
+      try {
+        // Find the referrer (person who referred this user)
+        const referrer = await User.findOne({ phone: user.referredBy });
+        
+        if (referrer) {
+          // Calculate commission (16% of investment amount for direct referrals)
+          const commissionAmount = investAmount * 0.16;
+          
+          // Add commission to referrer's earn balance and commission tracking
+          referrer.earnBalance += commissionAmount;
+          referrer.referralCommission += commissionAmount;
+          referrer.totalCommissionEarned += commissionAmount;
+          
+          await referrer.save();
+          
+          // Create a transaction record for the commission
+          const Transaction = (await import('../../../../models/Transaction')).default;
+          await Transaction.create({
+            userId: referrer.phone,
+            userName: referrer.name,
+            type: 'referral_income',
+            amount: commissionAmount,
+            status: 'approved',
+            description: `Referral commission from ${user.name} (${user.phone}) for plan purchase`,
+            referredUser: user.phone,
+            referralLevel: 'A'
+          });
+          
+          console.log(`Commission added to ${referrer.name}: Rs${commissionAmount} for ${user.name}'s plan purchase`);
+        }
+      } catch (commissionError) {
+        console.error('Error adding referral commission:', commissionError);
+        // Don't fail the investment creation if commission fails
+      }
+    }
     
     return Response.json(investment);
     

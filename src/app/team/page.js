@@ -277,7 +277,7 @@ export default function TeamPage() {
 
           {/* Total Earnings */}
           <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center">
                 <svg className="w-6 h-6 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
@@ -286,8 +286,57 @@ export default function TeamPage() {
               </div>
               <span className="text-xl font-bold text-purple-900">Rs{teamData.totalEarnings.total.toFixed(2)}</span>
             </div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm font-medium text-green-700">Available for Withdrawal</span>
+                </div>
+                <span className="text-sm font-bold text-green-600">Rs{userData?.referralCommission?.toFixed(2) || '0.00'}</span>
+              </div>
+              <p className="text-xs text-green-600 mt-1">Your team commission is automatically added to your account balance</p>
+            </div>
           </div>
+
+
           
+          {/* Commission Breakdown */}
+          <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+            <h4 className="text-sm font-medium text-green-800 mb-3 flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Commission Breakdown
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Total Commission Earned</span>
+                  <span className="text-sm font-bold text-green-600">Rs{userData?.totalCommissionEarned?.toFixed(2) || '0.00'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">Available Commission</span>
+                  <span className="text-sm font-bold text-blue-600">Rs{userData?.referralCommission?.toFixed(2) || '0.00'}</span>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Level A Rate</span>
+                  <span className="text-sm font-bold text-purple-600">16%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">Level B & C Rate</span>
+                  <span className="text-sm font-bold text-purple-600">2%</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+              <strong>💡 Note:</strong> Team commission is automatically calculated and added to your account balance. You can withdraw it anytime from your main balance!
+            </div>
+          </div>
+
           <button className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-purple-700 transition-colors">
             Check
           </button>
