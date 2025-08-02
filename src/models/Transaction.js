@@ -13,7 +13,7 @@ const transactionSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['recharge', 'withdraw', 'daily_income', 'referral_income', 'coupon_redeem']
+    enum: ['recharge', 'withdraw', 'daily_income', 'referral_income', 'coupon_redeem', 'signup_bonus']
   },
   amount: {
     type: Number,
