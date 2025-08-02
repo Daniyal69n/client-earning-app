@@ -167,9 +167,9 @@ export default function ProfilePage() {
       const response = await fetch(`/api/transactions?userId=${userId}`)
       if (response.ok) {
         const transactions = await response.json()
-        setRechargeHistory(transactions.filter(tx => tx.type === 'recharge'))
-        setWithdrawHistory(transactions.filter(tx => tx.type === 'withdraw'))
-        showSuccess('Transaction history refreshed!')
+                    setRechargeHistory(transactions.filter(tx => tx.type === 'recharge'))
+            setWithdrawHistory(transactions.filter(tx => tx.type === 'withdraw'))
+            showSuccess('Transaction history refreshed!')
       }
     } catch (error) {
       console.error('Error loading transaction history:', error)
