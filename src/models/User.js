@@ -66,6 +66,10 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  signupBonus: {
+    type: Number,
+    default: 0
+  },
   lastDailyIncomeDate: {
     type: String,
     default: null
